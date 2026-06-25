@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(59, 130, 246, 0.12), transparent),
+    radial-gradient(900px 500px at -10% 10%, rgba(245, 158, 11, 0.08), transparent),
+    #0a0e17;
+  color: #e7ecf5;
+  min-height: 100vh;
+}
+
+/* Round, satisfying button feel everywhere */
+button:not(:disabled) {
+  cursor: pointer;
+}
+button {
+  transition:
+    transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+/* Gentle floating motion for the map landmarks (GPU-accelerated, low cost) */
+@keyframes floaty {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(var(--tilt, 0deg)); }
+  50% { transform: translate3d(0, -6px, 0) rotate(var(--tilt, 0deg)); }
+}
+.animate-floaty {
+  animation: floaty 6s ease-in-out infinite;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-floaty,
+  .animate-bounce {
+    animation: none !important;
+  }
+  button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* Accessibility: a consistent, visible focus ring for keyboard users only.
+   A box-shadow ring automatically follows each element's existing
+   border-radius (pill, rounded, or square) and isn't suppressed by
+   Tailwind's `outline-none` (e.g. on the code editor textareas). */
+:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #0a0e17,
+    0 0 0 4px #60a5fa;
+  transition: box-shadow 0.12s ease;
+}
+
+/* Tiny markdown-ish styling for inline `code` and **bold** rendered by hand */
+.prose-frc code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875em;
+  background: #1a2235;
+  border: 1px solid #26304a;
+  padding: 0.1em 0.4em;
+  border-radius: 0.3rem;
+  color: #93c5fd;
+}
