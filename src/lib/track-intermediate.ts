@@ -8,8 +8,8 @@ import type { Track, Lesson } from "./types";
 const encoders: Lesson = {
   id: "encoders",
   title: "Encoders",
-  blurb: "Measure how far and how fast a mechanism has moved.",
-  minutes: 11,
+  blurb: "Measure how far and how fast a mechanism has moved — through the full gear chain.",
+  minutes: 14,
   blocks: [
     {
       type: "text",
@@ -98,14 +98,39 @@ const encoders: Lesson = {
       ],
       hint: "`return (ticks / TICKS_PER_REV) / GEAR_RATIO;`",
     },
+    {
+      type: "text",
+      md: "Put the whole chain together — this is the conversion every distance-based command and odometry depends on. Encoder ticks become motor revolutions (÷ ticks-per-rev), then mechanism revolutions (÷ gear ratio), then meters of wheel travel (× π × diameter). One wrong factor here and the robot drives the wrong distance with code that looks correct.",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Write the full conversion as a pure function: `double ticksToMeters(double ticks, double ticksPerRev, double gearRatio, double wheelDiameter)` = `(ticks / ticksPerRev / gearRatio) × (π × wheelDiameter)`.",
+      starter:
+        "public double ticksToMeters(double ticks, double ticksPerRev, double gearRatio, double wheelDiameter) {\n    // ticks -> motor revs -> mechanism revs -> meters\n}",
+      solution:
+        "public double ticksToMeters(double ticks, double ticksPerRev, double gearRatio, double wheelDiameter) {\n    double mechRevs = ticks / ticksPerRev / gearRatio;\n    return mechRevs * Math.PI * wheelDiameter;\n}",
+      checks: [
+        { label: "Divides ticks by ticksPerRev", pattern: "ticks\\s*/\\s*ticksPerRev" },
+        { label: "Divides by gearRatio", pattern: "/\\s*gearRatio" },
+        { label: "Multiplies by circumference (π × diameter)", pattern: "Math\\.PI\\s*\\*\\s*wheelDiameter|wheelDiameter\\s*\\*\\s*Math\\.PI" },
+      ],
+      hint: "`double mechRevs = ticks / ticksPerRev / gearRatio;` then `return mechRevs * Math.PI * wheelDiameter;`.",
+      tests: [
+        { method: "ticksToMeters", args: [2048.0, 2048.0, 1.0, 0.1016], expected: 0.31919, tolerance: 1e-4 },
+        { method: "ticksToMeters", args: [2048.0, 2048.0, 10.0, 0.1016], expected: 0.031919, tolerance: 1e-5 },
+        { method: "ticksToMeters", args: [0.0, 2048.0, 10.0, 0.1016], expected: 0.0 },
+        { method: "ticksToMeters", args: [4096.0, 2048.0, 2.0, 0.1016], expected: 0.31919, tolerance: 1e-4 },
+      ],
+    },
   ],
 };
 
 const gyro: Lesson = {
   id: "gyro",
   title: "Gyroscopes & Heading",
-  blurb: "Know which way the robot is facing.",
-  minutes: 10,
+  blurb: "Know which way the robot is facing — and turn the short way every time.",
+  minutes: 14,
   blocks: [
     {
       type: "text",
@@ -185,6 +210,40 @@ const gyro: Lesson = {
         { label: "Returns the wrapped value", pattern: "return\\s+" },
       ],
       hint: "`return ((deg + 180) % 360 + 360) % 360 - 180;` — the double-modulo handles negative inputs.",
+      tests: [
+        { method: "wrap", args: [170.0], expected: 170.0, tolerance: 1e-9 },
+        { method: "wrap", args: [-170.0], expected: -170.0, tolerance: 1e-9 },
+        { method: "wrap", args: [190.0], expected: -170.0, tolerance: 1e-9 },
+        { method: "wrap", args: [350.0], expected: -10.0, tolerance: 1e-9 },
+        { method: "wrap", args: [540.0], expected: -180.0, tolerance: 1e-9 },
+        { method: "wrap", args: [0.0], expected: 0.0 },
+      ],
+    },
+    {
+      type: "text",
+      md: "Wrapping the *error* is what `enableContinuousInput` does internally, and it's worth seeing the shortest-path calculation on its own. Given a target and a measured heading, the shortest signed turn is `wrap(target − measured)` — a number in [-180, 180) telling the controller both how far and which way to rotate. This single helper is the difference between a turn-to-angle command that snaps efficiently and one that occasionally spins the long way around.",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Write `double shortestTurn(double target, double measured)` returning the shortest signed angular distance (degrees) from `measured` to `target`, wrapped into [-180, 180). Reuse the same `((x + 180) % 360 + 360) % 360 - 180` wrap on the difference.",
+      starter:
+        "public double shortestTurn(double target, double measured) {\n    double diff = target - measured;\n    // wrap diff into [-180, 180) and return it\n}",
+      solution:
+        "public double shortestTurn(double target, double measured) {\n    double diff = target - measured;\n    return ((diff + 180) % 360 + 360) % 360 - 180;\n}",
+      checks: [
+        { label: "Computes the raw difference", pattern: "diff\\s*=\\s*target\\s*-\\s*measured" },
+        { label: "Wraps with modulo 360", pattern: "%\\s*360" },
+        { label: "Returns the wrapped difference", pattern: "return\\s+" },
+      ],
+      hint: "`double diff = target - measured;` then `return ((diff + 180) % 360 + 360) % 360 - 180;`.",
+      tests: [
+        { method: "shortestTurn", args: [170.0, -170.0], expected: -20.0, tolerance: 1e-9 },
+        { method: "shortestTurn", args: [-170.0, 170.0], expected: 20.0, tolerance: 1e-9 },
+        { method: "shortestTurn", args: [90.0, 0.0], expected: 90.0, tolerance: 1e-9 },
+        { method: "shortestTurn", args: [10.0, 350.0], expected: 20.0, tolerance: 1e-9 },
+        { method: "shortestTurn", args: [0.0, 0.0], expected: 0.0 },
+      ],
     },
   ],
 };
