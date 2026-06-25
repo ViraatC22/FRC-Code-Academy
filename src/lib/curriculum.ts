@@ -10,9 +10,9 @@ import { swerveTrack } from "./track-swerve";
 
 const variables: Lesson = {
   id: "variables",
-  title: "Variables",
-  blurb: "Store and name the numbers your robot cares about.",
-  minutes: 8,
+  title: "Variables, Types & Units",
+  blurb: "Store the numbers your robot cares about — and the type/unit discipline that keeps control code correct.",
+  minutes: 15,
   blocks: [
     {
       type: "text",
@@ -126,15 +126,52 @@ const variables: Lesson = {
         { label: "Returns value outside the deadband", pattern: "return\\s+value\\s*;" },
       ],
       hint: "`if (Math.abs(value) < band) { return 0.0; }` then, after the if, `return value;`.",
+      tests: [
+        { method: "applyDeadband", args: [0.05, 0.1], expected: 0.0 },
+        { method: "applyDeadband", args: [-0.08, 0.1], expected: 0.0 },
+        { method: "applyDeadband", args: [0.5, 0.1], expected: 0.5 },
+        { method: "applyDeadband", args: [-0.9, 0.1], expected: -0.9 },
+        { method: "applyDeadband", args: [0.1, 0.1], expected: 0.1 },
+      ],
+    },
+    {
+      type: "text",
+      md: "**Sensors don't speak meters — you convert.** A drivetrain encoder reports *ticks* (or motor rotations). To turn that into a distance your control code can use, you chain unit conversions:\n\n`revolutions = ticks / ticksPerRevolution`\n\n`distance = revolutions × (π × wheelDiameter)`\n\nbecause one wheel revolution moves the robot exactly one wheel circumference (`π × d`). This single calculation underpins odometry, autonomous driving, and every distance-based command — and it's where the integer-division trap bites hardest, since `ticks` and `ticksPerRevolution` are both `int`.",
+    },
+    {
+      type: "callout",
+      tone: "warn",
+      md: "Pick units once and never mix them. WPILib's newer APIs standardize on **meters, radians, and seconds**. A constant like `WHEEL_DIAMETER = 0.1016` (a 4-inch wheel in meters) belongs in one place, documented — a unit mistake here makes the robot drive the wrong distance with code that looks perfectly correct.",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Write `double ticksToMeters(int ticks, int ticksPerRev, double wheelDiameter)` that converts an encoder reading to meters of travel. Compute revolutions as `ticks / ticksPerRev` (watch the integer-division trap!), then multiply by the wheel circumference `π × wheelDiameter`.",
+      starter:
+        "public double ticksToMeters(int ticks, int ticksPerRev, double wheelDiameter) {\n    // 1) revolutions = ticks / ticksPerRev  (force double division!)\n    // 2) return revolutions * circumference\n}",
+      solution:
+        "public double ticksToMeters(int ticks, int ticksPerRev, double wheelDiameter) {\n    double revolutions = (double) ticks / ticksPerRev;\n    return revolutions * Math.PI * wheelDiameter;\n}",
+      checks: [
+        { label: "Declares ticksToMeters(int, int, double)", pattern: "double\\s+ticksToMeters\\s*\\(" },
+        { label: "Forces double division with a cast", pattern: "\\(\\s*double\\s*\\)\\s*ticks" },
+        { label: "Uses the circumference (π × diameter)", pattern: "Math\\.PI\\s*\\*\\s*wheelDiameter|wheelDiameter\\s*\\*\\s*Math\\.PI" },
+      ],
+      hint: "Cast first: `double revolutions = (double) ticks / ticksPerRev;` then `return revolutions * Math.PI * wheelDiameter;`. Without the cast, `ticks / ticksPerRev` is integer division and returns 0 for any partial revolution.",
+      tests: [
+        { method: "ticksToMeters", args: [2048, 2048, 0.1016], expected: 0.31919, tolerance: 1e-4 },
+        { method: "ticksToMeters", args: [1024, 2048, 0.1016], expected: 0.159593, tolerance: 1e-4 },
+        { method: "ticksToMeters", args: [0, 2048, 0.1016], expected: 0.0 },
+        { method: "ticksToMeters", args: [4096, 2048, 0.1016], expected: 0.638372, tolerance: 1e-4 },
+      ],
     },
   ],
 };
 
 const loops: Lesson = {
   id: "loops",
-  title: "Loops",
-  blurb: "Run code over and over — the heartbeat of every robot program.",
-  minutes: 10,
+  title: "Loops & the Periodic Model",
+  blurb: "Repetition is the robot's heartbeat — and why a blocking loop is a safety bug.",
+  minutes: 14,
   blocks: [
     {
       type: "text",
@@ -261,6 +298,38 @@ const loops: Lesson = {
         { label: "Returns sum divided by the count", pattern: "return\\s+sum\\s*/\\s*positions\\.length" },
       ],
       hint: "Declare `double sum = 0;`, add `positions[i]` inside the loop, then `return sum / positions.length;`.",
+      tests: [
+        { method: "averagePosition", args: [[1.0, 2.0, 3.0, 4.0]], expected: 2.5 },
+        { method: "averagePosition", args: [[0.0, 0.0, 0.0, 0.0]], expected: 0.0 },
+        { method: "averagePosition", args: [[5.0]], expected: 5.0 },
+        { method: "averagePosition", args: [[-2.0, 2.0]], expected: 0.0 },
+      ],
+    },
+    {
+      type: "text",
+      md: "Here's a loop that does real work on a swerve drive. When you ask all four modules for their speeds, the math can hand back values above `1.0` — but a motor caps at `1.0`, so if you just clip them the robot drives the *wrong direction* (the ratios between modules break). The fix is **desaturation**: find the largest-magnitude speed, and if it exceeds `1.0`, divide *every* speed by it so the whole set scales down together and the direction is preserved. The first step — scanning the array for the maximum absolute value — is a loop with a running accumulator, just like a sum.",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Write `double maxAbs(double[] speeds)` that returns the largest absolute value in the array — the first half of swerve desaturation. Track a running maximum across the loop using `Math.abs`.",
+      starter:
+        "public double maxAbs(double[] speeds) {\n    double max = 0;\n    // scan every element; keep the largest magnitude\n}",
+      solution:
+        "public double maxAbs(double[] speeds) {\n    double max = 0;\n    for (int i = 0; i < speeds.length; i++) {\n        if (Math.abs(speeds[i]) > max) {\n            max = Math.abs(speeds[i]);\n        }\n    }\n    return max;\n}",
+      checks: [
+        { label: "Initializes a running max", pattern: "double\\s+max\\s*=\\s*0" },
+        { label: "Loops across speeds.length", pattern: "for\\s*\\(.*speeds\\.length" },
+        { label: "Compares magnitudes with Math.abs", pattern: "Math\\.abs\\(\\s*speeds\\[\\s*i\\s*\\]\\s*\\)\\s*>\\s*max" },
+        { label: "Returns the maximum", pattern: "return\\s+max" },
+      ],
+      hint: "Inside the loop: `if (Math.abs(speeds[i]) > max) { max = Math.abs(speeds[i]); }`, then `return max;` after the loop.",
+      tests: [
+        { method: "maxAbs", args: [[0.3, -0.9, 0.5, 1.2]], expected: 1.2 },
+        { method: "maxAbs", args: [[0.1, 0.2]], expected: 0.2 },
+        { method: "maxAbs", args: [[-3.0, 1.0]], expected: 3.0 },
+        { method: "maxAbs", args: [[0.0]], expected: 0.0 },
+      ],
     },
   ],
 };
@@ -268,8 +337,8 @@ const loops: Lesson = {
 const functions: Lesson = {
   id: "functions",
   title: "Functions (Methods)",
-  blurb: "Package robot actions into reusable, named commands.",
-  minutes: 10,
+  blurb: "Package robot actions into reusable methods — and build a real input-shaping pipeline.",
+  minutes: 14,
   blocks: [
     {
       type: "text",
@@ -407,6 +476,33 @@ const functions: Lesson = {
         { method: "clamp", args: [0.3], expected: 0.3 },
         { method: "clamp", args: [1.0], expected: 1.0 },
         { method: "clamp", args: [-1.0], expected: -1.0 },
+      ],
+    },
+    {
+      type: "text",
+      md: "A naive deadband has a hidden flaw: the instant the stick crosses the band, output **jumps** from 0 to `band` (e.g. 0.0 → 0.1). The driver feels a lurch. Real teams **rescale** the surviving range so output rises smoothly from 0 at the band edge to 1.0 at full stick:\n\n`output = (value − sign(value)·band) / (1 − band)`\n\nThis is *input shaping* — composing the small methods you just wrote (`Math.abs`, sign handling, the deadband idea) into one continuous transfer function. It's the exact preprocessing that sits between a joystick and `arcadeDrive`.",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Write `double processInput(double value, double band)`: return `0.0` inside the deadband, otherwise return the rescaled value `(value − Math.signum(value)·band) / (1.0 − band)` so output is continuous from the band edge (0) to full stick (±1).",
+      starter:
+        "public double processInput(double value, double band) {\n    if (Math.abs(value) < band) {\n        return 0.0;\n    }\n    // rescale the surviving range so there's no jump at the edge\n}",
+      solution:
+        "public double processInput(double value, double band) {\n    if (Math.abs(value) < band) {\n        return 0.0;\n    }\n    return (value - Math.signum(value) * band) / (1.0 - band);\n}",
+      checks: [
+        { label: "Declares processInput(double, double)", pattern: "double\\s+processInput\\s*\\(" },
+        { label: "Zeros out inside the deadband", pattern: "Math\\.abs\\(\\s*value\\s*\\)\\s*<\\s*band" },
+        { label: "Uses Math.signum for the sign", pattern: "Math\\.signum\\(\\s*value\\s*\\)" },
+        { label: "Divides by (1.0 - band) to rescale", pattern: "/\\s*\\(\\s*1(\\.0)?\\s*-\\s*band\\s*\\)" },
+      ],
+      hint: "After the deadband guard: `return (value - Math.signum(value) * band) / (1.0 - band);`. At value=band the numerator is 0; at value=1 it's (1-band), divided by (1-band) = 1.",
+      tests: [
+        { method: "processInput", args: [0.05, 0.1], expected: 0.0 },
+        { method: "processInput", args: [1.0, 0.1], expected: 1.0, tolerance: 1e-9 },
+        { method: "processInput", args: [0.55, 0.1], expected: 0.5, tolerance: 1e-9 },
+        { method: "processInput", args: [-1.0, 0.1], expected: -1.0, tolerance: 1e-9 },
+        { method: "processInput", args: [-0.55, 0.1], expected: -0.5, tolerance: 1e-9 },
       ],
     },
   ],
@@ -661,6 +757,12 @@ const javaBasics: Lesson = {
         { label: "Returns \"slow\" otherwise", pattern: "return\\s+\"slow\"" },
       ],
       hint: "`if (speed > 0.7) { return \"fast\"; }` then `return \"slow\";`.",
+      tests: [
+        { method: "describe", args: [0.8], expected: "fast" },
+        { method: "describe", args: [0.5], expected: "slow" },
+        { method: "describe", args: [0.7], expected: "slow" },
+        { method: "describe", args: [0.71], expected: "fast" },
+      ],
     },
   ],
 };
@@ -906,6 +1008,40 @@ const motorsAndDrive: Lesson = {
         { label: "Returns the result", pattern: "return\\s+" },
       ],
       hint: "`return input * Math.abs(input);`",
+      tests: [
+        { method: "shape", args: [0.5], expected: 0.25 },
+        { method: "shape", args: [-0.5], expected: -0.25 },
+        { method: "shape", args: [1.0], expected: 1.0 },
+        { method: "shape", args: [0.0], expected: 0.0 },
+        { method: "shape", args: [-0.2], expected: -0.04, tolerance: 1e-9 },
+      ],
+    },
+    {
+      type: "text",
+      md: "Here's the math `DifferentialDrive` actually runs. Arcade gives a forward `speed` and a `turn`; tank needs a left and right output. The combine step is simple addition — but it can exceed `±1.0`, so it needs the same **desaturation** you met with swerve: if either side overshoots, divide *both* by the larger magnitude so the ratio (and therefore the robot's curve) is preserved instead of clipped.\n\n`left = speed + turn`, `right = speed − turn`, then scale both by `max(|left|, |right|)` if that exceeds 1.",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Write `double arcadeLeft(double speed, double turn)` returning the *left* output of an arcade→tank conversion with desaturation: compute `left = speed + turn` and `right = speed - turn`, find `max = Math.max(Math.abs(left), Math.abs(right))`, and if `max > 1.0` divide `left` by `max`. Return `left`.",
+      starter:
+        "public double arcadeLeft(double speed, double turn) {\n    double left = speed + turn;\n    double right = speed - turn;\n    // desaturate: if either side exceeds 1.0, scale both down by the max\n}",
+      solution:
+        "public double arcadeLeft(double speed, double turn) {\n    double left = speed + turn;\n    double right = speed - turn;\n    double max = Math.max(Math.abs(left), Math.abs(right));\n    if (max > 1.0) {\n        left = left / max;\n    }\n    return left;\n}",
+      checks: [
+        { label: "Computes left = speed + turn", pattern: "left\\s*=\\s*speed\\s*\\+\\s*turn" },
+        { label: "Computes right = speed - turn", pattern: "right\\s*=\\s*speed\\s*-\\s*turn" },
+        { label: "Finds the max magnitude of both sides", pattern: "Math\\.max\\(\\s*Math\\.abs\\(\\s*left\\s*\\)\\s*,\\s*Math\\.abs\\(\\s*right\\s*\\)\\s*\\)" },
+        { label: "Only scales when max > 1.0", pattern: "max\\s*>\\s*1(\\.0)?" },
+      ],
+      hint: "After computing left, right, and max: `if (max > 1.0) { left = left / max; } return left;`. At speed=1, turn=1: left=2, right=0, max=2, so left becomes 1.0.",
+      tests: [
+        { method: "arcadeLeft", args: [0.5, 0.2], expected: 0.7, tolerance: 1e-9 },
+        { method: "arcadeLeft", args: [1.0, 1.0], expected: 1.0 },
+        { method: "arcadeLeft", args: [0.8, 0.8], expected: 1.0, tolerance: 1e-9 },
+        { method: "arcadeLeft", args: [0.5, -0.5], expected: 0.0 },
+        { method: "arcadeLeft", args: [0.2, -1.0], expected: -0.6666666666666666, tolerance: 1e-9 },
+      ],
     },
   ],
 };

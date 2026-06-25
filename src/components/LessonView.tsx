@@ -106,6 +106,7 @@ export function LessonView({
             checks={block.checks}
             hint={block.hint}
             tests={block.tests}
+            stateTests={block.stateTests}
             onSolved={(ok) => setActivity(i, ok)}
           />
         );

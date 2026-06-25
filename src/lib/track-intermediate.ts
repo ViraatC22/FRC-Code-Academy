@@ -192,8 +192,8 @@ const gyro: Lesson = {
 const pidControl: Lesson = {
   id: "pid-control",
   title: "PID Control",
-  blurb: "Drive a measured value to a target, smoothly and automatically.",
-  minutes: 14,
+  blurb: "Drive a measured value to a target — and implement the controller math yourself.",
+  minutes: 18,
   blocks: [
     {
       type: "text",
@@ -284,14 +284,71 @@ const pidControl: Lesson = {
       ],
       hint: "`out = Math.max(-1, Math.min(1, out));` then `motor.set(out);`",
     },
+    {
+      type: "text",
+      md: "Calling `controller.calculate()` is convenient, but you should understand what it computes — it's not magic. A discrete PID controller, once per loop, does exactly this:\n\n`error = setpoint − measurement`\n\n`derivative = (error − previousError) / dt`\n\n`output = kP·error + kI·(accumulated error) + kD·derivative`\n\nThe P term is proportional to *current* error, D to the *rate of change* of error (which is why it predicts and damps overshoot), and I to the *history* of error. Implementing even the PD core makes the tuning intuition concrete: P provides the restoring push, D fights the velocity that causes overshoot.",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Implement a PD controller's per-loop output. Write `double calculate(double setpoint, double measurement, double prevError, double kP, double kD)`: compute `error = setpoint - measurement`, `derivative = error - prevError`, and return `kP*error + kD*derivative`.",
+      starter:
+        "public double calculate(double setpoint, double measurement, double prevError, double kP, double kD) {\n    double error = setpoint - measurement;\n    // derivative is the change in error since last loop\n    // return the weighted sum of the P and D terms\n}",
+      solution:
+        "public double calculate(double setpoint, double measurement, double prevError, double kP, double kD) {\n    double error = setpoint - measurement;\n    double derivative = error - prevError;\n    return kP * error + kD * derivative;\n}",
+      checks: [
+        { label: "Computes error = setpoint - measurement", pattern: "error\\s*=\\s*setpoint\\s*-\\s*measurement" },
+        { label: "Computes derivative from the change in error", pattern: "derivative\\s*=\\s*error\\s*-\\s*prevError" },
+        { label: "Returns kP*error + kD*derivative", pattern: "kP\\s*\\*\\s*error\\s*\\+\\s*kD\\s*\\*\\s*derivative" },
+      ],
+      hint: "`double derivative = error - prevError;` then `return kP * error + kD * derivative;`.",
+      tests: [
+        { method: "calculate", args: [10.0, 8.0, 3.0, 0.5, 0.1], expected: 0.9, tolerance: 1e-9 },
+        { method: "calculate", args: [10.0, 10.0, 0.0, 0.5, 0.1], expected: 0.0 },
+        { method: "calculate", args: [5.0, 0.0, 0.0, 0.2, 0.0], expected: 1.0, tolerance: 1e-9 },
+        { method: "calculate", args: [0.0, 5.0, 0.0, 0.5, 0.0], expected: -2.5, tolerance: 1e-9 },
+        { method: "calculate", args: [10.0, 9.0, 2.0, 1.0, 0.5], expected: 0.5, tolerance: 1e-9 },
+      ],
+    },
+    {
+      type: "text",
+      md: "The **integral** term is fundamentally different from P and D: it has *memory*. Each loop it adds the current error to a running `integral` accumulator, so it grows as long as error persists — that's how it defeats steady-state error a pure-P controller can't. But that same memory is the source of **windup**: if error lingers (a stalled mechanism, a saturated output), the accumulator balloons and causes a big overshoot later when it 'unwinds'. You can only feel this by running the controller across *multiple* loops and watching the output keep climbing even when error is constant.",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Implement a PI controller that accumulates state across calls. The `Controller` class stores `kP`, `kI`, and a running `integral` (starts at 0). Complete `calculate(double error)` so it adds `error` to `integral`, then returns `kP*error + kI*integral`. The tests call it repeatedly on one instance — watch the integral build up.",
+      starter:
+        "public class Controller {\n    private double kP;\n    private double kI;\n    private double integral = 0;\n\n    public Controller(double kP, double kI) {\n        this.kP = kP;\n        this.kI = kI;\n    }\n\n    public double calculate(double error) {\n        // accumulate error into integral, then return kP*error + kI*integral\n    }\n}",
+      solution:
+        "public class Controller {\n    private double kP;\n    private double kI;\n    private double integral = 0;\n\n    public Controller(double kP, double kI) {\n        this.kP = kP;\n        this.kI = kI;\n    }\n\n    public double calculate(double error) {\n        integral += error;\n        return kP * error + kI * integral;\n    }\n}",
+      checks: [
+        { label: "Accumulates error into the integral", pattern: "integral\\s*\\+=\\s*error|integral\\s*=\\s*integral\\s*\\+\\s*error" },
+        { label: "Returns kP*error + kI*integral", pattern: "kP\\s*\\*\\s*error\\s*\\+\\s*kI\\s*\\*\\s*integral" },
+      ],
+      hint: "Two lines: `integral += error;` then `return kP * error + kI * integral;`. Because `integral` is a field, it survives between calls — that's what makes the I term accumulate.",
+      stateTests: [
+        {
+          className: "Controller",
+          ctorArgs: [0.5, 0.1],
+          label: "constant error 2.0",
+          steps: [
+            { method: "calculate", args: [2.0], expected: 1.2, tolerance: 1e-9 },
+            { method: "calculate", args: [2.0], expected: 1.4, tolerance: 1e-9 },
+            { method: "calculate", args: [2.0], expected: 1.6, tolerance: 1e-9 },
+            { method: "calculate", args: [0.0], expected: 0.6, tolerance: 1e-9, label: "error gone, but integral persists (windup) → 0.6" },
+          ],
+        },
+      ],
+    },
   ],
 };
 
 const feedforward: Lesson = {
   id: "feedforward",
   title: "Feedforward",
-  blurb: "Predict the effort a mechanism needs instead of only reacting.",
-  minutes: 12,
+  blurb: "Predict the effort a mechanism needs — and implement the kS/kV/kA model yourself.",
+  minutes: 16,
   blocks: [
     {
       type: "text",
@@ -361,6 +418,32 @@ const feedforward: Lesson = {
         { label: "Returns the sum", pattern: "return\\s+" },
       ],
       hint: "`return kS * Math.signum(vel) + kV * vel;` — `Math.signum` gives the direction (+1 / -1).",
+    },
+    {
+      type: "text",
+      md: "The full `SimpleMotorFeedforward` adds the acceleration term, giving the complete model WPILib uses:\n\n`u = kS·sgn(v) + kV·v + kA·a`\n\nWhen you command a motion profile (next lessons), you feed it the *target* velocity and acceleration each loop and this returns the voltage physics predicts — before PID touches the small remainder. Note `sgn(v)` is `0` when `v` is `0`, so a stopped mechanism with no commanded acceleration gets `0` volts of feedforward (correct — nothing to overcome).",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Implement the full feedforward as a pure function of its gains and the commanded motion. Write `double feedforward(double kS, double kV, double kA, double velocity, double accel)` returning `kS*Math.signum(velocity) + kV*velocity + kA*accel`.",
+      starter:
+        "public double feedforward(double kS, double kV, double kA, double velocity, double accel) {\n    // kS in the direction of motion, plus the velocity and acceleration terms\n}",
+      solution:
+        "public double feedforward(double kS, double kV, double kA, double velocity, double accel) {\n    return kS * Math.signum(velocity) + kV * velocity + kA * accel;\n}",
+      checks: [
+        { label: "Static term kS * Math.signum(velocity)", pattern: "kS\\s*\\*\\s*Math\\.signum\\(\\s*velocity\\s*\\)" },
+        { label: "Velocity term kV * velocity", pattern: "kV\\s*\\*\\s*velocity" },
+        { label: "Acceleration term kA * accel", pattern: "kA\\s*\\*\\s*accel" },
+      ],
+      hint: "`return kS * Math.signum(velocity) + kV * velocity + kA * accel;`",
+      tests: [
+        { method: "feedforward", args: [0.2, 2.5, 0.1, 2.0, 0.0], expected: 5.2, tolerance: 1e-9 },
+        { method: "feedforward", args: [0.2, 2.5, 0.1, 0.0, 0.0], expected: 0.0 },
+        { method: "feedforward", args: [0.2, 2.5, 0.1, -2.0, 0.0], expected: -5.2, tolerance: 1e-9 },
+        { method: "feedforward", args: [0.2, 2.5, 0.1, 1.0, 3.0], expected: 3.0, tolerance: 1e-9 },
+        { method: "feedforward", args: [1.0, 0.0, 0.0, 5.0, 0.0], expected: 1.0, tolerance: 1e-9 },
+      ],
     },
   ],
 };

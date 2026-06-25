@@ -80,6 +80,74 @@ export function runTests(source: string, cases: TestCase[]): { compiled: boolean
   return { compiled: true, outcomes };
 }
 
+// ---- Stateful (sequenced) tests ----
+// Construct one instance of a user class, then drive it through a series of
+// method calls that share state — needed for controllers with an integral
+// term, slew-rate limiters, motion-profile integrators, debouncers, etc.
+
+export interface SequenceStep {
+  /** Instance method to call. */
+  method: string;
+  args: unknown[];
+  /** If set, the call's return value is checked against this. */
+  expected?: number | string | boolean;
+  tolerance?: number;
+  /** Optional label override for this step. */
+  label?: string;
+}
+
+export interface SequenceTest {
+  /** User class to instantiate. */
+  className: string;
+  /** Constructor arguments. */
+  ctorArgs?: unknown[];
+  steps: SequenceStep[];
+  label?: string;
+}
+
+export function runSequences(
+  source: string,
+  tests: SequenceTest[],
+): { compiled: boolean; error?: string; outcomes: TestOutcome[] } {
+  try {
+    new Interpreter(parse(source)); // compile check
+  } catch (e) {
+    return { compiled: false, error: describe(e), outcomes: [] };
+  }
+
+  const outcomes: TestOutcome[] = [];
+  for (const test of tests) {
+    let runtime: Interpreter;
+    let instance;
+    try {
+      runtime = new Interpreter(parse(source));
+      instance = runtime.newInstance(test.className, test.ctorArgs ?? []);
+    } catch (e) {
+      return { compiled: false, error: describe(e), outcomes: [] };
+    }
+    test.steps.forEach((step, i) => {
+      const res = runtime.invokeInstance(instance, step.method, step.args);
+      if (step.expected === undefined) {
+        // a "drive" step that only advances state; surface failures only
+        if (!res.ok) {
+          outcomes.push({ label: step.label ?? `${step.method}(...)`, passed: false, detail: res.error });
+        }
+        return;
+      }
+      const label =
+        step.label ??
+        `${test.label ? test.label + ": " : ""}${step.method}(${step.args.map((a) => javaStr(a)).join(", ")}) → ${javaStr(step.expected)}`;
+      if (!res.ok) {
+        outcomes.push({ label, passed: false, detail: res.error });
+        return;
+      }
+      const ok = compare(res.returnValue, step.expected, step.tolerance ?? 1e-6);
+      outcomes.push({ label, passed: ok, detail: ok ? undefined : `got ${javaStr(res.returnValue)} (step ${i + 1})` });
+    });
+  }
+  return { compiled: true, outcomes };
+}
+
 function compare(actual: unknown, expected: unknown, tol: number): boolean {
   if (typeof expected === "number" && typeof actual === "number") {
     return Math.abs(actual - expected) <= tol;

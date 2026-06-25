@@ -37,20 +37,45 @@ export type Block =
        *  When present, the exercise actually RUNS the learner's code and every
        *  case must pass too (in addition to the regex checks). */
       tests?: RuntimeTest[];
+      /** Optional stateful tests: construct a class instance and drive it
+       *  through a sequence of calls that share state (controllers with an
+       *  integral term, slew-rate limiters, motion-profile integrators, …). */
+      stateTests?: RuntimeStateTest[];
     };
 
 /** A method-level runtime test executed by the in-browser Java interpreter. */
 export interface RuntimeTest {
   /** Method to invoke (must be defined in the learner's code). */
   method: string;
-  /** Arguments passed to the method. */
-  args: (number | string | boolean)[];
+  /** Arguments passed to the method (scalars or 1-D arrays for array params). */
+  args: (number | string | boolean | number[])[];
   /** Expected return value. */
   expected: number | string | boolean;
   /** Optional label override; defaults to `method(args) → expected`. */
   label?: string;
   /** Float comparison tolerance (default 1e-6). */
   tolerance?: number;
+}
+
+/** One call in a stateful test sequence (runs on a shared class instance). */
+export interface RuntimeStateStep {
+  /** Instance method to call. */
+  method: string;
+  args: (number | string | boolean | number[])[];
+  /** If set, the call's return value is checked against this. Omit for a
+   *  "drive" step that only advances state. */
+  expected?: number | string | boolean;
+  tolerance?: number;
+  label?: string;
+}
+
+/** A stateful test: build one instance, then run the steps in order on it. */
+export interface RuntimeStateTest {
+  /** User class to instantiate. */
+  className: string;
+  ctorArgs?: (number | string | boolean | number[])[];
+  steps: RuntimeStateStep[];
+  label?: string;
 }
 
 export interface Lesson {

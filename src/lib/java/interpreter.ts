@@ -85,8 +85,43 @@ export class Interpreter {
     try {
       const m = this.methods.get(name);
       if (!m) return { output: this.out.join(""), ok: false, error: `No method named '${name}' found.` };
-      const argv: Val[] = args.map((a) => v(a, Number.isInteger(a) && typeof a === "number"));
+      const argv: Val[] = args.map((a) => marshal(a));
       const ret = this.invoke(m, argv, this.globals);
+      return { output: this.out.join(""), ok: true, returnValue: ret.value };
+    } catch (e) {
+      return this.fail(e);
+    }
+  }
+
+  /** Construct an instance of a user class (runs field inits + constructor).
+   *  Returns a persistent JObject so a sequence of calls can share state. */
+  newInstance(className: string, args: unknown[]): JObject {
+    const cdef = this.classes.get(className);
+    if (!cdef) throw new JavaRuntimeError(`No class named '${className}' found.`);
+    const obj: JObject = { __object: true, className, fields: new Map() };
+    for (const f of cdef.fields) {
+      obj.fields.set(f.name, {
+        value: f.init ? this.evalExpr(f.init, this.globals).value : defaultValue(f.type),
+        int: isIntType(f.type),
+      });
+    }
+    const ctor = cdef.members.find(
+      (m) => m.kind === "method" && m.name.startsWith("<init>"),
+    ) as Extract<Stmt, { kind: "method" }> | undefined;
+    if (ctor) this.invoke(ctor, args.map(marshal), this.globals, obj);
+    return obj;
+  }
+
+  /** Invoke an instance method on a previously-constructed object, preserving
+   *  its field state across calls (used by stateful test sequences). */
+  invokeInstance(obj: JObject, method: string, args: unknown[]): RunResult {
+    try {
+      const cdef = this.classes.get(obj.className);
+      const m = cdef?.members.find(
+        (mm) => mm.kind === "method" && mm.name === method,
+      ) as Extract<Stmt, { kind: "method" }> | undefined;
+      if (!m) return { output: this.out.join(""), ok: false, error: `No method '${method}' on class '${obj.className}'.` };
+      const ret = this.invoke(m, args.map(marshal), this.globals, obj);
       return { output: this.out.join(""), ok: true, returnValue: ret.value };
     } catch (e) {
       return this.fail(e);
@@ -229,6 +264,12 @@ export class Interpreter {
       case "name": {
         const slot = scope.lookup(e.id);
         if (slot) return v(slot.value, slot.int);
+        // Implicit `this.field` — bare field names inside instance methods.
+        const self = scope.lookup("this");
+        if (self && isObject(self.value)) {
+          const f = self.value.fields.get(e.id);
+          if (f) return v(f.value, f.int);
+        }
         // Bare class names (Math, System, Integer...) resolve lazily in member access.
         return v({ __builtinClass: e.id });
       }
@@ -357,9 +398,14 @@ export class Interpreter {
 
   private storeTo(target: Expr, val: Val, scope: Scope): void {
     if (target.kind === "name") {
-      if (!scope.assign(target.id, val.value, val.int)) {
-        scope.declare(target.id, val.value, val.int);
+      if (scope.assign(target.id, val.value, val.int)) return;
+      // Implicit `this.field` assignment inside instance methods.
+      const self = scope.lookup("this");
+      if (self && isObject(self.value) && self.value.fields.has(target.id)) {
+        self.value.fields.set(target.id, { value: val.value, int: val.int });
+        return;
       }
+      scope.declare(target.id, val.value, val.int);
       return;
     }
     if (target.kind === "index") {
@@ -583,6 +629,15 @@ export class Interpreter {
 }
 
 // ---- helpers ----
+
+/** Convert a raw JS test-case argument into a runtime Val (arrays → JArray). */
+function marshal(a: unknown): Val {
+  if (Array.isArray(a)) {
+    const elemInt = a.every((x) => typeof x === "number" && Number.isInteger(x));
+    return v({ __array: true, elems: a.map((x) => (Array.isArray(x) ? marshal(x).value : x)), elemInt } as JArray);
+  }
+  return v(a, typeof a === "number" && Number.isInteger(a));
+}
 
 function literal(val: Val): Expr {
   if (typeof val.value === "number") return { kind: "num", value: val.value, isInt: val.int };

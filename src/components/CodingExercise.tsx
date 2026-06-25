@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { CodeCheck, RuntimeTest } from "@/lib/types";
+import type { CodeCheck, RuntimeTest, RuntimeStateTest } from "@/lib/types";
 import { gradeCode, normalize, type CheckResult } from "@/lib/grade";
-import { runJava, runTests, type TestOutcome } from "@/lib/java";
+import { runJava, runTests, runSequences, type TestOutcome } from "@/lib/java";
 import { InlineMd } from "./InlineMd";
 
 interface CodingExerciseProps {
@@ -13,6 +13,7 @@ interface CodingExerciseProps {
   checks: CodeCheck[];
   hint?: string;
   tests?: RuntimeTest[];
+  stateTests?: RuntimeStateTest[];
   onSolved?: (solved: boolean) => void;
 }
 
@@ -29,6 +30,7 @@ export function CodingExercise({
   checks,
   hint,
   tests,
+  stateTests,
   onSolved,
 }: CodingExerciseProps) {
   const [code, setCode] = useState(starter);
@@ -39,7 +41,7 @@ export function CodingExercise({
   const [showHint, setShowHint] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
 
-  const hasTests = !!tests && tests.length > 0;
+  const hasTests = (!!tests && tests.length > 0) || (!!stateTests && stateTests.length > 0);
 
   const solved = useMemo(() => {
     const checksOk = results !== null && results.length > 0 && results.every((r) => r.passed);
@@ -75,13 +77,24 @@ export function CodingExercise({
 
     let testsOk = true;
     if (hasTests) {
-      const t = runTests(code, tests!);
-      if (!t.compiled) {
-        setTestResults([{ label: "Code compiles and runs", passed: false, detail: t.error }]);
+      const outcomes: TestOutcome[] = [];
+      let compileErr: string | undefined;
+      if (tests && tests.length > 0) {
+        const t = runTests(code, tests);
+        if (!t.compiled) compileErr = t.error;
+        else outcomes.push(...t.outcomes);
+      }
+      if (!compileErr && stateTests && stateTests.length > 0) {
+        const s = runSequences(code, stateTests);
+        if (!s.compiled) compileErr = s.error;
+        else outcomes.push(...s.outcomes);
+      }
+      if (compileErr) {
+        setTestResults([{ label: "Code compiles and runs", passed: false, detail: compileErr }]);
         testsOk = false;
       } else {
-        setTestResults(t.outcomes);
-        testsOk = t.outcomes.length > 0 && t.outcomes.every((o) => o.passed);
+        setTestResults(outcomes);
+        testsOk = outcomes.length > 0 && outcomes.every((o) => o.passed);
       }
     } else {
       setTestResults(null);
