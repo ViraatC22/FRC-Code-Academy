@@ -11,19 +11,37 @@ import { Decoration, type DecorKind } from "./MapDecor";
 // --- Layout constants -----------------------------------------------------
 const MAP_W = 340; // logical map width; centered via mx-auto
 const CENTER = MAP_W / 2;
-const ROW_H = 150; // vertical distance between nodes
-const START_Y = 128; // top padding so the first module banner + START bubble fit
-const BANNER_GAP = 106; // how far above a node its module banner sits
-const MAX_OFFSET = 104; // how far nodes wander from the center line
+const ROW_H = 132; // vertical distance between consecutive nodes
+const MODULE_GAP = 60; // extra space before a new module, so its banner has room
+const START_Y = 116; // top padding so the first banner + START bubble fit
+const BANNER_GAP = 88; // how far above a node its module banner sits
+const MAX_OFFSET = 88; // how far nodes wander from the center line
 const NODE = 64;
 
+// Stable 0..1 seed from a track id, so each track gets a distinct winding path
+// (the curve below is phase- and amplitude-shifted by this seed) while staying
+// fully deterministic across SSR/client.
+function trackSeed(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 1000) / 1000;
+}
+
 // Deterministic "treasure-map" wander: smooth drift + stable jitter so the
-// path looks hand-drawn and random rather than a perfect spiral.
-function wander(i: number): number {
-  const jitterSeed = Math.sin(i * 12.9898) * 43758.5453;
+// path looks hand-drawn rather than a perfect spiral. The `seed` shifts the
+// phase, flips the lead direction, and varies amplitude per track so no two
+// levels trace the same shape.
+function wander(i: number, seed: number): number {
+  const phase = seed * Math.PI * 2;
+  const dir = seed < 0.5 ? 1 : -1; // some tracks lean left first, others right
+  const amp = 0.78 + seed * 0.22; // 0.78..1.0 of MAX_OFFSET
+  const jitterSeed = Math.sin((i + 1) * (12.9898 + seed * 4)) * 43758.5453;
   const jitter = jitterSeed - Math.floor(jitterSeed); // 0..1
-  const drift = Math.sin(i * 0.9 + 0.6); // smooth -1..1
-  const v = drift * 0.62 + (jitter - 0.5) * 1.0; // -~1.1..1.1
+  const drift = Math.sin(i * 0.9 + 0.6 + phase); // smooth -1..1
+  const v = dir * (drift * 0.66 + (jitter - 0.5) * 0.9) * amp;
   // Round to an integer: keeps SSR and client style strings identical
   // (avoids float precision hydration mismatches).
   return Math.round(Math.max(-1, Math.min(1, v)) * MAX_OFFSET);
@@ -82,26 +100,36 @@ export function LessonMap({ track }: { track: Track }) {
     ? lessons.findIndex((l, i) => isUnlocked(i) && !completed.has(l.id))
     : 0;
 
+  const seed = trackSeed(track.id);
+
   // Flatten lessons into absolute-positioned items, tagging module boundaries.
+  // A running `y` lets us insert MODULE_GAP before each new module so its
+  // banner gets its own band instead of colliding with the prior label.
   const items: MapItem[] = [];
   let gi = -1;
   let prevModule = "";
+  let y = START_Y;
   for (const module of track.modules) {
+    let firstInModule = true;
     for (const lesson of module.lessons) {
       gi += 1;
+      const newModule = module.title !== prevModule;
+      if (newModule && gi > 0) y += MODULE_GAP;
       items.push({
         lesson,
         index: gi,
-        x: CENTER + wander(gi),
-        y: START_Y + gi * ROW_H,
+        x: CENTER + wander(gi, seed),
+        y,
         moduleTitle: module.title,
-        firstOfModule: module.title !== prevModule,
+        firstOfModule: newModule && firstInModule,
       });
       prevModule = module.title;
+      firstInModule = false;
+      y += ROW_H;
     }
   }
 
-  const trophy = { x: CENTER, y: START_Y + lessons.length * ROW_H };
+  const trophy = { x: CENTER, y };
   const totalH = trophy.y + 110;
   const trail = trailPath([...items.map((it) => ({ x: it.x, y: it.y })), trophy]);
 
@@ -115,37 +143,43 @@ export function LessonMap({ track }: { track: Track }) {
         viewBox={`0 0 ${MAP_W} ${totalH}`}
         fill="none"
       >
+        {/* Soft under-stroke gives the path depth; dotted trail rides on top */}
+        <path d={trail} stroke="#caa45a" strokeWidth="11" strokeLinecap="round" opacity="0.06" />
         <path
           d={trail}
           stroke="#caa45a"
           strokeWidth="4"
           strokeLinecap="round"
           strokeDasharray="0.5 13"
-          opacity="0.5"
+          opacity="0.55"
         />
       </svg>
 
-      {/* Landmarks — placed on the opposite side of each node's lean */}
+      {/* Landmarks — placed on the opposite side of each node's lean. The
+          centering transform lives on the wrapper; the floaty animation only
+          transforms the inner SVG, so the two never fight (which previously
+          shoved every landmark down-right of its slot). */}
       {items.map((it) => {
         const decor = DECOR[it.index % DECOR.length];
         const onLeft = it.x >= CENTER; // node leans right -> decor on left
-        const dx = onLeft ? -118 : 118;
-        let lx = it.x + dx;
-        lx = Math.max(20, Math.min(MAP_W - 20, lx));
+        const dx = onLeft ? -120 : 120;
+        const lx = Math.max(24, Math.min(MAP_W - 24, it.x + dx));
         return (
-          <Decoration
+          <div
             key={`decor-${it.index}`}
-            kind={decor.kind}
-            size={46}
-            className="animate-floaty pointer-events-none absolute opacity-70"
-            style={{
-              left: lx,
-              top: it.y,
-              transform: "translate(-50%, -50%)",
-              ["--tilt" as string]: `${decor.tilt}deg`,
-              animationDelay: `${(it.index % 5) * 0.5}s`,
-            }}
-          />
+            className="pointer-events-none absolute"
+            style={{ left: lx, top: it.y, transform: "translate(-50%, -50%)" }}
+          >
+            <Decoration
+              kind={decor.kind}
+              size={42}
+              className="animate-floaty opacity-60"
+              style={{
+                ["--tilt" as string]: `${decor.tilt}deg`,
+                animationDelay: `${(it.index % 5) * 0.5}s`,
+              }}
+            />
+          </div>
         );
       })}
 
@@ -155,14 +189,12 @@ export function LessonMap({ track }: { track: Track }) {
         .map((it) => (
           <div
             key={`mod-${it.index}`}
-            className="absolute -translate-x-1/2"
+            className="absolute z-10 -translate-x-1/2 text-center"
             style={{ left: CENTER, top: it.y - BANNER_GAP, width: MAP_W }}
           >
-            <div className="text-center">
-              <span className="rounded-full border border-edge bg-panel/90 px-4 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted shadow">
-                {it.moduleTitle}
-              </span>
-            </div>
+            <span className="rounded-full border border-edge bg-panel/95 px-4 py-1 text-[11px] font-semibold uppercase tracking-wider text-brand2 shadow-[0_2px_0_rgba(0,0,0,0.35)]">
+              {it.moduleTitle}
+            </span>
           </div>
         ))}
 
@@ -203,7 +235,7 @@ export function LessonMap({ track }: { track: Track }) {
               </div>
             </div>
             <div
-              className={`pointer-events-none mt-2 max-w-[8.5rem] text-center text-xs ${
+              className={`pointer-events-none mt-2 max-w-[7.5rem] rounded-md bg-ink/75 px-2 py-0.5 text-center text-xs font-medium leading-snug backdrop-blur-sm ${
                 unlocked ? "text-white" : "text-muted"
               }`}
             >
