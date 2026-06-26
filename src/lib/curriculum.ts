@@ -512,7 +512,7 @@ const classes: Lesson = {
   id: "classes",
   title: "Classes & Objects",
   blurb: "Model real robot parts as code objects you can control.",
-  minutes: 12,
+  minutes: 16,
   blocks: [
     {
       type: "text",
@@ -635,6 +635,64 @@ const classes: Lesson = {
         { label: "Raises otherwise", pattern: "raise\\(\\s*\\)" },
       ],
       hint: "`if (isRaised()) { lower(); } else { raise(); }` — let the existing methods do the work.",
+    },
+    {
+      type: "text",
+      md: "Most real robot state isn't a single yes/no flag — it's a value the object must **keep valid for itself**. An elevator has a discrete height level; nothing outside the class should be able to shove it past its top stop or below the floor. The class enforces those limits internally, every time, so no caller can put the hardware in an impossible state. That self-protecting state is exactly what a WPILib subsystem provides for its mechanism.",
+    },
+    {
+      type: "callout",
+      tone: "tip",
+      md: "Mark fields `final` when they're set once at construction and never reassigned — like a port number or a max height. The compiler then guarantees nobody mutates them later, turning a class of bugs into a compile error.",
+    },
+    {
+      type: "quiz",
+      question:
+        "Your elevator overshoots its top hard stop and bends a bracket. The `up()` method just did `position += 1` with no check. Where does the fix belong?",
+      options: [
+        "In every command that calls up(), add an if-check before calling it",
+        "Inside the Elevator class, so up() itself refuses to exceed the max — one owner, one guarantee",
+        "Add a comment telling drivers not to hold the up button",
+        "Make position public so callers can clamp it themselves",
+      ],
+      answerIndex: 1,
+      explanation:
+        "Encapsulation means the limit lives with the state it protects. If `up()` enforces the max itself, the guarantee holds no matter who calls it or how often. Pushing the check onto every caller (or exposing the field) is how two code paths end up disagreeing and the bracket bends.",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Build an `Elevator` that protects its own state. It tracks an integer `position` (starts at 0) up to `maxLevel` (set in the constructor). Implement `up()` to raise one level but never above `maxLevel`, `down()` to lower one level but never below 0, and `atTop()` to return whether it's at `maxLevel`. The tests drive one elevator through a sequence — including over-pressing past the limits.",
+      starter:
+        "public class Elevator {\n    private int position = 0;\n    private final int maxLevel;\n\n    public Elevator(int maxLevel) {\n        this.maxLevel = maxLevel;\n    }\n\n    public void up() {\n        // raise one level, but never above maxLevel\n    }\n\n    public void down() {\n        // lower one level, but never below 0\n    }\n\n    public int getPosition() {\n        return position;\n    }\n\n    public boolean atTop() {\n        // true when at the highest level\n    }\n}",
+      solution:
+        "public class Elevator {\n    private int position = 0;\n    private final int maxLevel;\n\n    public Elevator(int maxLevel) {\n        this.maxLevel = maxLevel;\n    }\n\n    public void up() {\n        if (position < maxLevel) {\n            position += 1;\n        }\n    }\n\n    public void down() {\n        if (position > 0) {\n            position -= 1;\n        }\n    }\n\n    public int getPosition() {\n        return position;\n    }\n\n    public boolean atTop() {\n        return position == maxLevel;\n    }\n}",
+      checks: [
+        { label: "up() clamps against maxLevel", pattern: "position\\s*<\\s*maxLevel" },
+        { label: "down() clamps against 0", pattern: "position\\s*>\\s*0" },
+        { label: "atTop() compares position to maxLevel", pattern: "position\\s*==\\s*maxLevel" },
+      ],
+      hint: "Guard each move: `if (position < maxLevel) { position += 1; }` and `if (position > 0) { position -= 1; }`. `atTop()` is just `return position == maxLevel;`.",
+      stateTests: [
+        {
+          className: "Elevator",
+          ctorArgs: [3],
+          label: "drive the elevator, including over-pressing the limits",
+          steps: [
+            { method: "up", args: [] },
+            { method: "getPosition", args: [], expected: 1, label: "one level up → 1" },
+            { method: "up", args: [] },
+            { method: "up", args: [] },
+            { method: "getPosition", args: [], expected: 3, label: "raised to the top → 3" },
+            { method: "atTop", args: [], expected: true, label: "atTop() → true" },
+            { method: "up", args: [] },
+            { method: "getPosition", args: [], expected: 3, label: "up() past the top clamps → still 3" },
+            { method: "down", args: [] },
+            { method: "getPosition", args: [], expected: 2, label: "down one → 2" },
+            { method: "atTop", args: [], expected: false, label: "no longer at top → false" },
+          ],
+        },
+      ],
     },
   ],
 };
