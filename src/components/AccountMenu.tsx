@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useAccount } from "./AccountProvider";
 import { useProgress } from "./ProgressProvider";
@@ -81,6 +82,13 @@ export function AccountMenu() {
                 <span className="h-1.5 w-1.5 rounded-full bg-good" />
                 Progress syncing to the cloud
               </div>
+              <Link
+                href="/submissions"
+                onClick={() => setOpen(false)}
+                className="block w-full rounded-full border border-edge px-4 py-2 text-center text-sm text-muted transition hover:text-white active:scale-95"
+              >
+                My submissions
+              </Link>
               <button
                 type="button"
                 onClick={() => { signOut(); setOpen(false); }}
