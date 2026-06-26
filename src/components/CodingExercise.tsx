@@ -4,9 +4,14 @@ import { useMemo, useState } from "react";
 import type { CodeCheck, RuntimeTest, RuntimeStateTest } from "@/lib/types";
 import { gradeCode, normalize, type CheckResult } from "@/lib/grade";
 import { runJava, runTests, runSequences, type TestOutcome } from "@/lib/java";
+import { persistGradedSubmission, toTestResults } from "@/lib/submissions/client";
+import { useAccount } from "./AccountProvider";
 import { InlineMd } from "./InlineMd";
 
 interface CodingExerciseProps {
+  /** Identifies which exercise this attempt belongs to, for persisted submissions. */
+  lessonId: string;
+  blockIndex: number;
   prompt: string;
   starter: string;
   solution: string;
@@ -24,6 +29,8 @@ function meaningful(code: string): string {
 }
 
 export function CodingExercise({
+  lessonId,
+  blockIndex,
   prompt,
   starter,
   solution,
@@ -33,6 +40,7 @@ export function CodingExercise({
   stateTests,
   onSolved,
 }: CodingExerciseProps) {
+  const { account } = useAccount();
   const [code, setCode] = useState(starter);
   const [results, setResults] = useState<CheckResult[] | null>(null);
   const [testResults, setTestResults] = useState<TestOutcome[] | null>(null);
@@ -76,6 +84,7 @@ export function CodingExercise({
     setResults(r);
 
     let testsOk = true;
+    let finalTests: TestOutcome[] | null = null;
     if (hasTests) {
       const outcomes: TestOutcome[] = [];
       let compileErr: string | undefined;
@@ -90,9 +99,11 @@ export function CodingExercise({
         else outcomes.push(...s.outcomes);
       }
       if (compileErr) {
-        setTestResults([{ label: "Code compiles and runs", passed: false, detail: compileErr }]);
+        finalTests = [{ label: "Code compiles and runs", passed: false, detail: compileErr }];
+        setTestResults(finalTests);
         testsOk = false;
       } else {
+        finalTests = outcomes;
         setTestResults(outcomes);
         testsOk = outcomes.length > 0 && outcomes.every((o) => o.passed);
       }
@@ -102,6 +113,18 @@ export function CodingExercise({
 
     const checksOk = r.length > 0 && r.every((x) => x.passed);
     onSolved?.(checksOk && testsOk);
+
+    // Persist this graded attempt as a submission (Tier-1 practice). Fire-and-
+    // forget: signed-out learners or an unreachable server never block grading.
+    if (account) {
+      void persistGradedSubmission({
+        userId: account.userId,
+        lessonId,
+        blockIndex,
+        code,
+        results: toTestResults(r, finalTests),
+      });
+    }
   }
 
   return (

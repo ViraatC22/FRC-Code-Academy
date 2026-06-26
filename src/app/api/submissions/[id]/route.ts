@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { submissionDb } from "@/lib/submissions/store.server";
-import { IllegalTransitionError } from "@/lib/submissions/lifecycle";
+import { isIllegalTransition } from "@/lib/submissions/lifecycle";
 import type { SubmissionRun, SubmissionState } from "@/lib/submissions/types";
 
 // GET   /api/submissions/:id  → one submission with its run history
@@ -45,8 +45,8 @@ export async function PATCH(
       { status: 400 },
     );
   } catch (err) {
-    if (err instanceof IllegalTransitionError) {
-      return NextResponse.json({ error: err.message }, { status: 409 });
+    if (isIllegalTransition(err)) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 409 });
     }
     // Unknown id surfaces from the store as a plain Error.
     return NextResponse.json(

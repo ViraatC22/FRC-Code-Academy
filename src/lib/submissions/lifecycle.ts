@@ -31,6 +31,13 @@ export class IllegalTransitionError extends Error {
   }
 }
 
+/** Robust check for an illegal-transition error. Uses `name` rather than
+ *  `instanceof` so it survives Next.js bundling the route and store into
+ *  separate server bundles (where class identity wouldn't match). */
+export function isIllegalTransition(err: unknown): err is IllegalTransitionError {
+  return err instanceof Error && err.name === "IllegalTransitionError";
+}
+
 /** Assert + return the target state, throwing on an illegal edge. */
 export function transition(from: SubmissionState, to: SubmissionState): SubmissionState {
   if (!canTransition(from, to)) throw new IllegalTransitionError(from, to);

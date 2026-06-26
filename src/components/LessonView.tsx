@@ -100,6 +100,8 @@ export function LessonView({
         return (
           <CodingExercise
             key={i}
+            lessonId={lesson.id}
+            blockIndex={i}
             prompt={block.prompt}
             starter={block.starter}
             solution={block.solution}
