@@ -829,7 +829,7 @@ const wpilibIntro: Lesson = {
   id: "wpilib-intro",
   title: "What is WPILib?",
   blurb: "The library that turns Java into robot control.",
-  minutes: 8,
+  minutes: 13,
   blocks: [
     {
       type: "text",
@@ -934,6 +934,41 @@ const wpilibIntro: Lesson = {
         { label: "Inverts the right motor", pattern: "rightMotor\\.setInverted\\(\\s*true\\s*\\)" },
       ],
       hint: "`rightMotor.setInverted(true);` — and note it's in robotInit (runs once), not a periodic method.",
+    },
+    {
+      type: "text",
+      md: "Let's make the Init-once / Periodic-many split concrete by modeling it ourselves. Imagine a tiny robot object that counts how many times each lifecycle method has run. `robotInit()` should perform setup *exactly once* per power-up; `teleopPeriodic()` runs every loop. If you mistakenly put setup in the periodic method, its counter would climb past 1 — which is precisely the CAN-flooding bug from the quiz, made visible.",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Model a robot's lifecycle. In `robotInit()` set `inverted` to true and increment `configCount`. In `teleopPeriodic()` increment `driveCount`. The tests call robotInit once and teleopPeriodic several times, then check the counters — proving setup ran once while control ran every loop.",
+      starter:
+        "public class Robot {\n    private boolean inverted = false;\n    private int configCount = 0;\n    private int driveCount = 0;\n\n    public void robotInit() {\n        // one-time setup: invert, and count this configuration\n    }\n\n    public void teleopPeriodic() {\n        // per-loop control: count this drive cycle\n    }\n\n    public int getConfigCount() {\n        return configCount;\n    }\n\n    public int getDriveCount() {\n        return driveCount;\n    }\n\n    public boolean isInverted() {\n        return inverted;\n    }\n}",
+      solution:
+        "public class Robot {\n    private boolean inverted = false;\n    private int configCount = 0;\n    private int driveCount = 0;\n\n    public void robotInit() {\n        inverted = true;\n        configCount += 1;\n    }\n\n    public void teleopPeriodic() {\n        driveCount += 1;\n    }\n\n    public int getConfigCount() {\n        return configCount;\n    }\n\n    public int getDriveCount() {\n        return driveCount;\n    }\n\n    public boolean isInverted() {\n        return inverted;\n    }\n}",
+      checks: [
+        { label: "robotInit sets inverted to true", pattern: "inverted\\s*=\\s*true" },
+        { label: "robotInit counts the configuration", pattern: "configCount\\s*\\+=\\s*1|configCount\\s*=\\s*configCount\\s*\\+\\s*1" },
+        { label: "teleopPeriodic counts a drive cycle", pattern: "driveCount\\s*\\+=\\s*1|driveCount\\s*=\\s*driveCount\\s*\\+\\s*1" },
+      ],
+      hint: "robotInit: `inverted = true; configCount += 1;`. teleopPeriodic: `driveCount += 1;`.",
+      stateTests: [
+        {
+          className: "Robot",
+          ctorArgs: [],
+          label: "init once, periodic many",
+          steps: [
+            { method: "robotInit", args: [] },
+            { method: "teleopPeriodic", args: [] },
+            { method: "teleopPeriodic", args: [] },
+            { method: "teleopPeriodic", args: [] },
+            { method: "getConfigCount", args: [], expected: 1, label: "setup ran exactly once → 1" },
+            { method: "getDriveCount", args: [], expected: 3, label: "control ran every loop → 3" },
+            { method: "isInverted", args: [], expected: true, label: "inversion applied → true" },
+          ],
+        },
+      ],
     },
   ],
 };
@@ -1108,7 +1143,7 @@ const subsystems: Lesson = {
   id: "subsystems",
   title: "Subsystems",
   blurb: "Organize the robot into independent, self-owning parts.",
-  minutes: 12,
+  minutes: 16,
   blocks: [
     {
       type: "text",
@@ -1221,6 +1256,43 @@ const subsystems: Lesson = {
       ],
       hint: "`return run(() -> set(0.7));` — `run` makes a command that calls the lambda each loop and requires this subsystem.",
     },
+    {
+      type: "text",
+      md: "The single-ownership rule isn't magic — it's a small piece of bookkeeping the scheduler does. Let's model it. A subsystem remembers which command currently *requires* it. When a new command requires it, the new one takes over and the previous holder is **interrupted**. Re-requiring it with the *same* command (it's already running) is not an interruption. Counting those interruptions is exactly how you'd reason about why a command unexpectedly stopped.",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Model requirement arbitration. `require(int commandId)` gives ownership to that command; if a *different* command already owned it (owner is non-zero and not equal to this command), that's an interruption — increment `interruptions`. Then set `owner` to the new command. The tests drive a sequence of requirements and check the interrupt count.",
+      starter:
+        "public class Subsystem {\n    private int owner = 0;        // 0 = nobody owns it\n    private int interruptions = 0;\n\n    public void require(int commandId) {\n        // if a different command already owns this, count an interruption\n        // then give ownership to commandId\n    }\n\n    public int getOwner() {\n        return owner;\n    }\n\n    public int getInterruptions() {\n        return interruptions;\n    }\n}",
+      solution:
+        "public class Subsystem {\n    private int owner = 0;        // 0 = nobody owns it\n    private int interruptions = 0;\n\n    public void require(int commandId) {\n        if (owner != 0 && owner != commandId) {\n            interruptions += 1;\n        }\n        owner = commandId;\n    }\n\n    public int getOwner() {\n        return owner;\n    }\n\n    public int getInterruptions() {\n        return interruptions;\n    }\n}",
+      checks: [
+        { label: "Detects a different existing owner", pattern: "owner\\s*!=\\s*0\\s*&&\\s*owner\\s*!=\\s*commandId" },
+        { label: "Counts the interruption", pattern: "interruptions\\s*\\+=\\s*1|interruptions\\s*=\\s*interruptions\\s*\\+\\s*1" },
+        { label: "Transfers ownership", pattern: "owner\\s*=\\s*commandId" },
+      ],
+      hint: "`if (owner != 0 && owner != commandId) { interruptions += 1; }` then `owner = commandId;`.",
+      stateTests: [
+        {
+          className: "Subsystem",
+          ctorArgs: [],
+          label: "two commands fighting over one subsystem",
+          steps: [
+            { method: "require", args: [1] },
+            { method: "getInterruptions", args: [], expected: 0, label: "first claim — nobody interrupted → 0" },
+            { method: "require", args: [1] },
+            { method: "getInterruptions", args: [], expected: 0, label: "same command re-requires — not an interruption → 0" },
+            { method: "require", args: [2] },
+            { method: "getOwner", args: [], expected: 2, label: "command 2 takes over → owner 2" },
+            { method: "getInterruptions", args: [], expected: 1, label: "command 1 was interrupted → 1" },
+            { method: "require", args: [3] },
+            { method: "getInterruptions", args: [], expected: 2, label: "command 2 interrupted in turn → 2" },
+          ],
+        },
+      ],
+    },
   ],
 };
 
@@ -1228,7 +1300,7 @@ const commands: Lesson = {
   id: "commands",
   title: "Commands",
   blurb: "Describe robot actions as composable units the scheduler runs.",
-  minutes: 13,
+  minutes: 17,
   blocks: [
     {
       type: "text",
@@ -1348,6 +1420,42 @@ const commands: Lesson = {
         { label: "Then runs Stop", pattern: "\\.andThen\\(\\s*new\\s+Stop\\(" },
       ],
       hint: "`return new DriveForward(drive).withTimeout(3.0).andThen(new Stop(drive));`",
+    },
+    {
+      type: "text",
+      md: "Let's implement the command lifecycle itself, in pure logic. A `DriveDistance` command accumulates distance each `execute()` and reports done from `isFinished()` once it reaches its target. The subtle correctness point: a well-behaved command **stops doing work once it's finished** — `execute()` must not keep driving past the target while the scheduler is still polling it in the same cycle. Guarding the accumulation with the same `distance >= targetMeters` test that `isFinished()` uses captures exactly that contract.",
+    },
+    {
+      type: "coding",
+      prompt:
+        "Implement the lifecycle of a `DriveDistance` command. Each `execute(double delta)` adds `delta` to `distance` — but only while `distance` is still below `targetMeters`. `isFinished()` returns true once `distance` reaches `targetMeters`. The tests run several execute() cycles and confirm the command stops accumulating once it's done.",
+      starter:
+        "public class DriveDistance {\n    private final double targetMeters;\n    private double distance = 0;\n\n    public DriveDistance(double targetMeters) {\n        this.targetMeters = targetMeters;\n    }\n\n    public void execute(double delta) {\n        // advance by delta, but only while distance < targetMeters\n    }\n\n    public boolean isFinished() {\n        // done once distance reaches the target\n    }\n\n    public double getDistance() {\n        return distance;\n    }\n}",
+      solution:
+        "public class DriveDistance {\n    private final double targetMeters;\n    private double distance = 0;\n\n    public DriveDistance(double targetMeters) {\n        this.targetMeters = targetMeters;\n    }\n\n    public void execute(double delta) {\n        if (distance < targetMeters) {\n            distance += delta;\n        }\n    }\n\n    public boolean isFinished() {\n        return distance >= targetMeters;\n    }\n\n    public double getDistance() {\n        return distance;\n    }\n}",
+      checks: [
+        { label: "execute() only advances while below target", pattern: "if\\s*\\(\\s*distance\\s*<\\s*targetMeters\\s*\\)" },
+        { label: "Accumulates distance", pattern: "distance\\s*\\+=\\s*delta|distance\\s*=\\s*distance\\s*\\+\\s*delta" },
+        { label: "isFinished compares distance to target", pattern: "distance\\s*>=\\s*targetMeters" },
+      ],
+      hint: "execute: `if (distance < targetMeters) { distance += delta; }`. isFinished: `return distance >= targetMeters;`.",
+      stateTests: [
+        {
+          className: "DriveDistance",
+          ctorArgs: [1.0],
+          label: "drive 1.0 m in 0.4 m steps, then stop accumulating",
+          steps: [
+            { method: "execute", args: [0.4] },
+            { method: "getDistance", args: [], expected: 0.4, tolerance: 1e-9, label: "after one step → 0.4" },
+            { method: "isFinished", args: [], expected: false, label: "not there yet → false" },
+            { method: "execute", args: [0.4] },
+            { method: "execute", args: [0.4] },
+            { method: "isFinished", args: [], expected: true, label: "reached 1.2 ≥ 1.0 → finished" },
+            { method: "execute", args: [0.4] },
+            { method: "getDistance", args: [], expected: 1.2, tolerance: 1e-9, label: "finished, so execute() no longer advances → still 1.2" },
+          ],
+        },
+      ],
     },
   ],
 };
