@@ -12,9 +12,10 @@ import { Decoration, type DecorKind } from "./MapDecor";
 const MAP_W = 340; // logical map width; centered via mx-auto
 const CENTER = MAP_W / 2;
 const ROW_H = 132; // vertical distance between consecutive nodes
-const MODULE_GAP = 60; // extra space before a new module, so its banner has room
-const START_Y = 116; // top padding so the first banner + START bubble fit
-const BANNER_GAP = 88; // how far above a node its module banner sits
+const MODULE_GAP = 74; // extra space before a new module, so its banner has room
+const START_Y = 150; // top padding so the first banner + START bubble fit
+const BANNER_GAP = 130; // banner sits above a node — high enough to clear the
+                        // floating "Start" bubble that hangs over the current node
 const MAX_OFFSET = 88; // how far nodes wander from the center line
 const NODE = 64;
 
