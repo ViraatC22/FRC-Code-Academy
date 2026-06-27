@@ -1,5 +1,6 @@
 import type { Track, Lesson } from "./types";
 import { pidLesson } from "./lessons/pid";
+import { feedforwardLesson } from "./lessons/feedforward";
 
 // ---------------------------------------------------------------------------
 // Intermediate Track: sensors, closed-loop control, and autonomous.
@@ -246,111 +247,6 @@ const gyro: Lesson = {
         { method: "shortestTurn", args: [90.0, 0.0], expected: 90.0, tolerance: 1e-9 },
         { method: "shortestTurn", args: [10.0, 350.0], expected: 20.0, tolerance: 1e-9 },
         { method: "shortestTurn", args: [0.0, 0.0], expected: 0.0 },
-      ],
-    },
-  ],
-};
-
-const feedforward: Lesson = {
-  id: "feedforward",
-  difficulty: "Hard",
-  title: "Feedforward",
-  blurb: "Predict the effort a mechanism needs — and implement the kS/kV/kA model yourself.",
-  minutes: 16,
-  blocks: [
-    {
-      type: "text",
-      md: "PID is **reactive** — it only acts once there's an error. **Feedforward** is **predictive**: it models the physics of your mechanism and supplies the voltage you *know* it'll need to hold or move. Pairing the two gives fast, accurate control: feedforward does the heavy lifting, PID cleans up the small remaining error.",
-    },
-    {
-      type: "code",
-      lang: "java",
-      caption: "A simple motor feedforward (static, velocity, acceleration gains)",
-      code: "SimpleMotorFeedforward ff = new SimpleMotorFeedforward(0.2, 2.5, 0.1);\n\n// voltage to hold a target velocity\ndouble volts = ff.calculate(targetVelocity);\nmotor.setVoltage(volts);",
-    },
-    {
-      type: "callout",
-      tone: "info",
-      md: "For an arm fighting gravity you'd use `ArmFeedforward`, which adds a term for holding angle. The idea is the same: compute the effort physics demands, *then* let PID correct the difference.",
-    },
-    {
-      type: "quiz",
-      question: "What is the key difference between feedforward and PID?",
-      options: [
-        "Feedforward predicts the needed effort; PID reacts to measured error",
-        "They are two names for the same thing",
-        "Feedforward only works on arms",
-        "PID is predictive; feedforward is reactive",
-      ],
-      answerIndex: 0,
-      explanation:
-        "Feedforward uses a physical model to anticipate the required output; PID corrects whatever error remains. Combined, they outperform either alone.",
-    },
-    {
-      type: "coding",
-      prompt:
-        "Combine feedforward and PID: compute `ff.calculate(targetVel)` plus `pid.calculate(encoder.getRate(), targetVel)` and apply the sum with `motor.setVoltage(...)`.",
-      starter: "public void execute() {\n    // combine feedforward + PID, then set voltage\n}",
-      solution:
-        "public void execute() {\n    double volts = ff.calculate(targetVel) + pid.calculate(encoder.getRate(), targetVel);\n    motor.setVoltage(volts);\n}",
-      checks: [
-        { label: "Calls ff.calculate(...)", pattern: "ff\\.calculate\\(" },
-        { label: "Calls pid.calculate(...)", pattern: "pid\\.calculate\\(" },
-        { label: "Sets motor voltage", pattern: "motor\\.setVoltage\\(" },
-      ],
-      hint: "Add the two calculate() results into one variable, then `motor.setVoltage(volts);`.",
-    },
-    {
-      type: "text",
-      md: "**Each feedforward gain models a specific physical effect**, and you measure them with a characterization tool (SysId) rather than guessing:\n\n- **kS** — static friction: the volts just to *start* moving, applied in the direction of motion\n- **kV** — the volts per unit of velocity (the dominant term at steady speed)\n- **kA** — the volts per unit of acceleration (matters during fast changes)\n\nAn arm adds **kG**, a gravity term, because holding it up takes voltage even at zero speed. Feedforward works in **volts**, which is why you pair it with `setVoltage()` — voltage control is consistent as the battery sags, unlike raw percent output.",
-    },
-    {
-      type: "quiz",
-      question:
-        "In `SimpleMotorFeedforward(kS, kV, kA)`, which gain is the voltage needed just to overcome static friction and start the mechanism moving?",
-      options: ["kV", "kS", "kA", "None — friction isn't modeled"],
-      answerIndex: 1,
-      explanation:
-        "kS is the static gain: the voltage to break friction, applied in the direction of travel. kV scales with velocity, kA with acceleration.",
-    },
-    {
-      type: "coding",
-      prompt:
-        "Implement a simple feedforward by hand. Write `volts(double vel)` returning `kS * Math.signum(vel) + kV * vel` — the static term (in the direction of motion) plus the velocity term.",
-      starter:
-        "public double volts(double vel) {\n    // kS overcomes friction in the direction of motion; kV scales with velocity\n}",
-      solution: "public double volts(double vel) {\n    return kS * Math.signum(vel) + kV * vel;\n}",
-      checks: [
-        { label: "Static term uses Math.signum(vel)", pattern: "kS\\s*\\*\\s*Math\\.signum\\(\\s*vel\\s*\\)" },
-        { label: "Velocity term is kV * vel", pattern: "kV\\s*\\*\\s*vel" },
-        { label: "Returns the sum", pattern: "return\\s+" },
-      ],
-      hint: "`return kS * Math.signum(vel) + kV * vel;` — `Math.signum` gives the direction (+1 / -1).",
-    },
-    {
-      type: "text",
-      md: "The full `SimpleMotorFeedforward` adds the acceleration term, giving the complete model WPILib uses:\n\n`u = kS·sgn(v) + kV·v + kA·a`\n\nWhen you command a motion profile (next lessons), you feed it the *target* velocity and acceleration each loop and this returns the voltage physics predicts — before PID touches the small remainder. Note `sgn(v)` is `0` when `v` is `0`, so a stopped mechanism with no commanded acceleration gets `0` volts of feedforward (correct — nothing to overcome).",
-    },
-    {
-      type: "coding",
-      prompt:
-        "Implement the full feedforward as a pure function of its gains and the commanded motion. Write `double feedforward(double kS, double kV, double kA, double velocity, double accel)` returning `kS*Math.signum(velocity) + kV*velocity + kA*accel`.",
-      starter:
-        "public double feedforward(double kS, double kV, double kA, double velocity, double accel) {\n    // kS in the direction of motion, plus the velocity and acceleration terms\n}",
-      solution:
-        "public double feedforward(double kS, double kV, double kA, double velocity, double accel) {\n    return kS * Math.signum(velocity) + kV * velocity + kA * accel;\n}",
-      checks: [
-        { label: "Static term kS * Math.signum(velocity)", pattern: "kS\\s*\\*\\s*Math\\.signum\\(\\s*velocity\\s*\\)" },
-        { label: "Velocity term kV * velocity", pattern: "kV\\s*\\*\\s*velocity" },
-        { label: "Acceleration term kA * accel", pattern: "kA\\s*\\*\\s*accel" },
-      ],
-      hint: "`return kS * Math.signum(velocity) + kV * velocity + kA * accel;`",
-      tests: [
-        { method: "feedforward", args: [0.2, 2.5, 0.1, 2.0, 0.0], expected: 5.2, tolerance: 1e-9 },
-        { method: "feedforward", args: [0.2, 2.5, 0.1, 0.0, 0.0], expected: 0.0 },
-        { method: "feedforward", args: [0.2, 2.5, 0.1, -2.0, 0.0], expected: -5.2, tolerance: 1e-9 },
-        { method: "feedforward", args: [0.2, 2.5, 0.1, 1.0, 3.0], expected: 3.0, tolerance: 1e-9 },
-        { method: "feedforward", args: [1.0, 0.0, 0.0, 5.0, 0.0], expected: 1.0, tolerance: 1e-9 },
       ],
     },
   ],
@@ -642,7 +538,7 @@ export const intermediateTrack: Track = {
       id: "closed-loop",
       title: "Closed-Loop Control",
       blurb: "Drive measured values to targets with PID and feedforward.",
-      lessons: [pidLesson, feedforward],
+      lessons: [pidLesson, feedforwardLesson],
     },
     {
       id: "autonomous",
