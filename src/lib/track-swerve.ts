@@ -6,6 +6,7 @@ import type { Lesson, Track } from "./types";
 
 const swerveIntro: Lesson = {
   id: "swerve-intro",
+  difficulty: "Medium",
   title: "What Makes Swerve Special",
   blurb: "Independent steer + drive on every wheel — and why teams obsess over it.",
   minutes: 9,
@@ -68,6 +69,7 @@ const swerveIntro: Lesson = {
 
 const swerveKinematics: Lesson = {
   id: "swerve-kinematics",
+  difficulty: "Expert",
   title: "Module Angles with atan2",
   blurb: "Turn a velocity vector into the angle each wheel must point.",
   minutes: 11,
@@ -126,6 +128,7 @@ const swerveKinematics: Lesson = {
 
 const fieldOriented: Lesson = {
   id: "swerve-field-oriented",
+  difficulty: "Hard",
   title: "Field-Oriented Control",
   blurb: "Make “push forward” mean forward on the field, not on the robot.",
   minutes: 12,
@@ -189,6 +192,7 @@ const fieldOriented: Lesson = {
 
 const swerveOptimize: Lesson = {
   id: "swerve-optimize",
+  difficulty: "Expert",
   title: "Angle Optimization",
   blurb: "Never spin a module more than 90° — reverse the wheel instead.",
   minutes: 12,

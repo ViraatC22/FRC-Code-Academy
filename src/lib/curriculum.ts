@@ -10,6 +10,7 @@ import { swerveTrack } from "./track-swerve";
 
 const variables: Lesson = {
   id: "variables",
+  difficulty: "Easy",
   title: "Variables, Types & Units",
   blurb: "Store the numbers your robot cares about — and the type/unit discipline that keeps control code correct.",
   minutes: 15,
@@ -169,6 +170,7 @@ const variables: Lesson = {
 
 const loops: Lesson = {
   id: "loops",
+  difficulty: "Easy",
   title: "Loops & the Periodic Model",
   blurb: "Repetition is the robot's heartbeat — and why a blocking loop is a safety bug.",
   minutes: 14,
@@ -336,6 +338,7 @@ const loops: Lesson = {
 
 const functions: Lesson = {
   id: "functions",
+  difficulty: "Easy",
   title: "Functions (Methods)",
   blurb: "Package robot actions into reusable methods — and build a real input-shaping pipeline.",
   minutes: 14,
@@ -510,6 +513,7 @@ const functions: Lesson = {
 
 const classes: Lesson = {
   id: "classes",
+  difficulty: "Medium",
   title: "Classes & Objects",
   blurb: "Model real robot parts as code objects you can control.",
   minutes: 16,
@@ -699,6 +703,7 @@ const classes: Lesson = {
 
 const javaBasics: Lesson = {
   id: "java-basics",
+  difficulty: "Easy",
   title: "Java Syntax Essentials",
   blurb: "Semicolons, braces, and the shape of every Java file.",
   minutes: 9,
@@ -827,6 +832,7 @@ const javaBasics: Lesson = {
 
 const wpilibIntro: Lesson = {
   id: "wpilib-intro",
+  difficulty: "Easy",
   title: "What is WPILib?",
   blurb: "The library that turns Java into robot control.",
   minutes: 13,
@@ -975,6 +981,7 @@ const wpilibIntro: Lesson = {
 
 const motorsAndDrive: Lesson = {
   id: "motors-and-drive",
+  difficulty: "Medium",
   title: "Motors & Driving",
   blurb: "Make the robot actually move.",
   minutes: 11,
@@ -1141,6 +1148,7 @@ const motorsAndDrive: Lesson = {
 
 const subsystems: Lesson = {
   id: "subsystems",
+  difficulty: "Medium",
   title: "Subsystems",
   blurb: "Organize the robot into independent, self-owning parts.",
   minutes: 16,
@@ -1298,6 +1306,7 @@ const subsystems: Lesson = {
 
 const commands: Lesson = {
   id: "commands",
+  difficulty: "Hard",
   title: "Commands",
   blurb: "Describe robot actions as composable units the scheduler runs.",
   minutes: 17,

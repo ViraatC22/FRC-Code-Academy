@@ -8,6 +8,7 @@ import { pidLesson } from "./lessons/pid";
 
 const encoders: Lesson = {
   id: "encoders",
+  difficulty: "Medium",
   title: "Encoders",
   blurb: "Measure how far and how fast a mechanism has moved — through the full gear chain.",
   minutes: 14,
@@ -129,6 +130,7 @@ const encoders: Lesson = {
 
 const gyro: Lesson = {
   id: "gyro",
+  difficulty: "Medium",
   title: "Gyroscopes & Heading",
   blurb: "Know which way the robot is facing — and turn the short way every time.",
   minutes: 14,
@@ -251,6 +253,7 @@ const gyro: Lesson = {
 
 const feedforward: Lesson = {
   id: "feedforward",
+  difficulty: "Hard",
   title: "Feedforward",
   blurb: "Predict the effort a mechanism needs — and implement the kS/kV/kA model yourself.",
   minutes: 16,
@@ -355,6 +358,7 @@ const feedforward: Lesson = {
 
 const pathplanner: Lesson = {
   id: "pathplanner",
+  difficulty: "Hard",
   title: "PathPlanner & Trajectories",
   blurb: "Make the robot follow a smooth, pre-planned route in autonomous.",
   minutes: 12,
@@ -452,6 +456,7 @@ const pathplanner: Lesson = {
 
 const visionBasics: Lesson = {
   id: "vision-basics",
+  difficulty: "Hard",
   title: "Vision & AprilTags",
   blurb: "Let the robot see targets and locate itself on the field.",
   minutes: 12,
@@ -542,6 +547,7 @@ const visionBasics: Lesson = {
 
 const stateMachines: Lesson = {
   id: "state-machines",
+  difficulty: "Medium",
   title: "State Machines",
   blurb: "Coordinate complex multi-step mechanisms reliably.",
   minutes: 12,

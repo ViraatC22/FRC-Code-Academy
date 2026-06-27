@@ -7,6 +7,7 @@ import type { Track, Lesson } from "./types";
 
 const odometry: Lesson = {
   id: "odometry",
+  difficulty: "Hard",
   title: "Odometry",
   blurb: "Track the robot's position on the field as it drives.",
   minutes: 13,
@@ -96,6 +97,7 @@ const odometry: Lesson = {
 
 const poseEstimation: Lesson = {
   id: "pose-estimation",
+  difficulty: "Expert",
   title: "Pose Estimation",
   blurb: "Fuse odometry with vision for a position you can trust.",
   minutes: 13,
@@ -186,6 +188,7 @@ const poseEstimation: Lesson = {
 
 const kalman: Lesson = {
   id: "kalman",
+  difficulty: "Expert",
   title: "Kalman Filters",
   blurb: "The math that powers trustworthy state estimation.",
   minutes: 11,
@@ -270,6 +273,7 @@ const kalman: Lesson = {
 
 const advantagekit: Lesson = {
   id: "advantagekit",
+  difficulty: "Hard",
   title: "Logging with AdvantageKit",
   blurb: "Record everything so you can debug matches after the fact.",
   minutes: 12,
@@ -357,6 +361,7 @@ const advantagekit: Lesson = {
 
 const simulation: Lesson = {
   id: "simulation",
+  difficulty: "Hard",
   title: "Simulation",
   blurb: "Test robot code without a robot.",
   minutes: 12,
@@ -437,6 +442,7 @@ const simulation: Lesson = {
 
 const canOptimization: Lesson = {
   id: "can-optimization",
+  difficulty: "Hard",
   title: "CAN Bus & Software Design",
   blurb: "Keep a complex robot's code fast, reliable, and maintainable.",
   minutes: 11,
