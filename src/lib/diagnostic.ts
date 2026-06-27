@@ -97,8 +97,8 @@ export const diagnostic: DiagnosticItem[] = [
   },
   {
     kind: "mcq",
-    lessonId: "java-basics",
-    lessonTitle: "Java Syntax Essentials",
+    lessonId: "java-variables",
+    lessonTitle: "Variables & Types",
     question: "Which statement is syntactically valid Java?",
     options: [
       "boolean ok = True;",

@@ -2,6 +2,10 @@ import type { Track, Lesson, Block } from "./types";
 import { intermediateTrack } from "./track-intermediate";
 import { advancedTrack } from "./track-advanced";
 import { swerveTrack } from "./track-swerve";
+import { javaVariablesLesson } from "./lessons/java/variables";
+import { javaOperatorsLesson } from "./lessons/java/operators";
+import { javaControlFlowLesson } from "./lessons/java/control-flow";
+import { javaMethodsLesson } from "./lessons/java/methods";
 
 // ---------------------------------------------------------------------------
 // Beginner Track: "I have never programmed" -> ready for command-based robots.
@@ -701,135 +705,6 @@ const classes: Lesson = {
   ],
 };
 
-const javaBasics: Lesson = {
-  id: "java-basics",
-  difficulty: "Easy",
-  title: "Java Syntax Essentials",
-  blurb: "Semicolons, braces, and the shape of every Java file.",
-  minutes: 9,
-  blocks: [
-    {
-      type: "text",
-      md: "FRC robots are programmed in **Java** (or C++). A few syntax rules apply to nearly every line you'll write:\n\n- Statements end with a **semicolon** `;`\n- Blocks of code are wrapped in **braces** `{ }`\n- Java is **case-sensitive**: `Motor` and `motor` are different names",
-    },
-    {
-      type: "code",
-      lang: "java",
-      caption: "The shape of a typical robot file",
-      code: "public class Robot {\n\n    public void teleopPeriodic() {\n        double power = 0.5;\n        drive.arcadeDrive(power, 0.0);\n    }\n}",
-    },
-    {
-      type: "text",
-      md: "Comments are notes the computer ignores — use them to explain *why*, not *what*:",
-    },
-    {
-      type: "code",
-      lang: "java",
-      code: "// single-line comment\n\n/*\n   multi-line comment,\n   handy for documenting a subsystem\n*/",
-    },
-    {
-      type: "callout",
-      tone: "warn",
-      md: "A missing semicolon or unmatched brace is the #1 beginner compile error. The editor underlines it in red — read the *first* error, since later ones are often just fallout from the first.",
-    },
-    {
-      type: "quiz",
-      question: "Which line is valid Java?",
-      options: [
-        "double power = 0.5",
-        "Double Power = 0.5;",
-        "double power = 0.5;",
-        "double power := 0.5;",
-      ],
-      answerIndex: 2,
-      explanation:
-        "It needs a lowercase `double` type, an `=` for assignment, and a closing semicolon. Option 2 uses `Double`/`Power` (wrong case for a primitive and convention) and option 4 uses `:=`, which isn't Java.",
-    },
-    {
-      type: "text",
-      md: "Two operators trip up beginners constantly:\n\n- `=` **assigns** a value: `speed = 0.5;`\n- `==` **compares** two values: `if (speed == 0.5)`\n\nUsing `=` where you meant `==` is a frequent bug. Java will often catch it, but not always.",
-    },
-    {
-      type: "code",
-      lang: "java",
-      code: "boolean stopped = (speed == 0.0);   // compare, then store the result\nif (stopped) {\n    System.out.println(\"Robot is stopped\");\n}",
-    },
-    {
-      type: "callout",
-      tone: "info",
-      md: "Java is **whitespace-insensitive** — indentation doesn't change meaning the way it does in Python. But consistent indentation is non-negotiable for readability, and your editor will auto-format it.",
-    },
-    {
-      type: "quiz",
-      question: "Which line correctly writes a single-line comment in Java?",
-      options: ["# stop the motor", "// stop the motor", "<!-- stop the motor -->", "/ stop the motor"],
-      answerIndex: 1,
-      explanation:
-        "Java single-line comments start with `//`. `#` is Python, `<!-- -->` is HTML. Block comments use `/* ... */`.",
-    },
-    {
-      type: "coding",
-      prompt:
-        "The line below won't compile because it's missing something Java requires at the end of every statement. Rewrite it correctly to declare an `int` named `port` equal to `3`.",
-      starter: "int port = 3",
-      solution: "int port = 3;",
-      checks: [
-        { label: "Declares int port = 3", pattern: "int\\s+port\\s*=\\s*3" },
-        { label: "Ends the statement with a semicolon", pattern: "int\\s+port\\s*=\\s*3\\s*;" },
-      ],
-      hint: "Every Java statement ends with a `;`.",
-    },
-    {
-      type: "text",
-      md: "**One gotcha that bites everyone: comparing text.** For objects (like `String`), `==` checks whether two variables point to the *same object*, not whether they hold the same characters. To compare contents you call `.equals()`. This matters in robot code when you read an auto-routine name from the dashboard and compare it — `==` can silently fail even when the text looks identical.",
-    },
-    {
-      type: "code",
-      lang: "java",
-      caption: "== vs .equals() for Strings",
-      code: "String chosen = chooser.getSelected();\n\nif (chosen == \"CenterAuto\")      { /* unreliable! */ }\nif (chosen.equals(\"CenterAuto\")) { /* correct */ }",
-    },
-    {
-      type: "callout",
-      tone: "tip",
-      md: "Rule of thumb: use `==` for primitives (`int`, `double`, `boolean`), and `.equals()` for objects like `String`. Mixing them up is a silent logic bug, not a compile error — the compiler won't warn you.",
-    },
-    {
-      type: "quiz",
-      question: "Two `String` variables `a` and `b` both contain the text \"auto\". What does `a == b` actually test?",
-      options: [
-        "Whether they contain the same characters",
-        "Whether they are the same object in memory — use a.equals(b) to compare the text",
-        "It's always true whenever the text matches",
-        "It won't compile for Strings",
-      ],
-      answerIndex: 1,
-      explanation:
-        "`==` compares object references, so it can be false even when the characters match. `a.equals(b)` compares the actual contents. For Strings (and objects generally), always use `.equals()`.",
-    },
-    {
-      type: "coding",
-      prompt:
-        "Write `describe(double speed)` that returns the String `\"fast\"` when `speed` is greater than 0.7, and otherwise returns `\"slow\"`.",
-      starter: "public String describe(double speed) {\n    // return \"fast\" when speed > 0.7, otherwise \"slow\"\n}",
-      solution:
-        "public String describe(double speed) {\n    if (speed > 0.7) {\n        return \"fast\";\n    }\n    return \"slow\";\n}",
-      checks: [
-        { label: "Tests speed > 0.7", pattern: "speed\\s*>\\s*0\\.7" },
-        { label: "Returns \"fast\" when above", pattern: "return\\s+\"fast\"" },
-        { label: "Returns \"slow\" otherwise", pattern: "return\\s+\"slow\"" },
-      ],
-      hint: "`if (speed > 0.7) { return \"fast\"; }` then `return \"slow\";`.",
-      tests: [
-        { method: "describe", args: [0.8], expected: "fast" },
-        { method: "describe", args: [0.5], expected: "slow" },
-        { method: "describe", args: [0.7], expected: "slow" },
-        { method: "describe", args: [0.71], expected: "fast" },
-      ],
-    },
-  ],
-};
-
 const wpilibIntro: Lesson = {
   id: "wpilib-intro",
   difficulty: "Easy",
@@ -1508,11 +1383,13 @@ export const javaForFrcTrack: Track = {
     "Learn the Java language in the context you'll actually use it — writing robot code. The vocabulary and syntax every WPILib program is built from.",
   modules: [
     {
-      id: "java-language",
-      title: "Java Language Foundations",
-      blurb: "The syntax and structure of the language FRC robots are written in.",
-      lessons: [javaBasics],
+      id: "java-foundations",
+      title: "Java Foundations",
+      blurb: "The language's building blocks: types, expressions, decisions, and methods.",
+      lessons: [javaVariablesLesson, javaOperatorsLesson, javaControlFlowLesson, javaMethodsLesson],
     },
+    // Further modules (Object-Oriented Java, Robust Java, Java for WPILib) are
+    // built out lesson by lesson to the same depth standard.
   ],
 };
 
