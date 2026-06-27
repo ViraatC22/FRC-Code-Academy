@@ -156,7 +156,7 @@ export interface Module {
 export interface Track {
   id: string;
   title: string;
-  level: "Beginner" | "Intermediate" | "Advanced" | "Specialist";
+  level: "Java" | "Beginner" | "Intermediate" | "Advanced" | "Specialist";
   blurb: string;
   modules: Module[];
 }

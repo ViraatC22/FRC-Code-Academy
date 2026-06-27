@@ -1483,12 +1483,6 @@ export const beginnerTrack: Track = {
       lessons: [variables, loops, functions, classes],
     },
     {
-      id: "java-fundamentals",
-      title: "Java Fundamentals",
-      blurb: "The specific language FRC robots are written in.",
-      lessons: [javaBasics],
-    },
-    {
       id: "robot-fundamentals",
       title: "Robot Fundamentals",
       blurb: "Meet WPILib and make a robot move.",
@@ -1503,7 +1497,32 @@ export const beginnerTrack: Track = {
   ],
 };
 
-export const tracks: Track[] = [beginnerTrack, intermediateTrack, advancedTrack, swerveTrack];
+// Java for FRC Programming — the language itself, taught in robot context.
+// Seeded with the existing Java Syntax lesson moved out of the Beginner track;
+// its full curriculum (types, OOP, collections, etc.) is developed separately.
+export const javaForFrcTrack: Track = {
+  id: "java",
+  title: "Java for FRC Programming",
+  level: "Java",
+  blurb:
+    "Learn the Java language in the context you'll actually use it — writing robot code. The vocabulary and syntax every WPILib program is built from.",
+  modules: [
+    {
+      id: "java-language",
+      title: "Java Language Foundations",
+      blurb: "The syntax and structure of the language FRC robots are written in.",
+      lessons: [javaBasics],
+    },
+  ],
+};
+
+export const tracks: Track[] = [
+  javaForFrcTrack,
+  beginnerTrack,
+  intermediateTrack,
+  advancedTrack,
+  swerveTrack,
+];
 
 // --- Lookup helpers -------------------------------------------------------
 
