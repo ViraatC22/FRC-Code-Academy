@@ -1,123 +1,154 @@
 import type { Lesson } from "../types";
 
-// Exemplar lesson for the redesigned educational model: every topic follows
-// Learn → Practice → Implement → Master, with tiered assessment (knowledge
-// check → guided/debug exercises → implementation labs) and runtime-tested
-// "Implement" work that mirrors a real FRC problem. Use this as the template
-// when migrating the rest of the curriculum.
+// Exemplar lesson for the educational model. Two principles the rest of the
+// curriculum follows:
+//  1) READING FIRST, AND DEEP. Each concept section carries real explanation —
+//     analogies, the math, FRC-grounded examples, and the common mistakes —
+//     not a sentence and a code block.
+//  2) TEACH → PRACTICE, INTERLEAVED. Practice lives next to the concept it
+//     tests (a quiz/predict/exercise at the end of each concept section), not
+//     piled into a single block at the end. Implement & Master come last.
+// Runtime-tested code passes gains as PARAMETERS (the interpreter evaluates
+// free fields to undefined).
 
 export const pidLesson: Lesson = {
   id: "pid-control",
   title: "PID Control",
-  blurb: "Drive a measured value to a target — understand the math, then build real controllers.",
+  blurb: "Drive a measured value to a target — understand each term deeply, then build real controllers.",
   difficulty: "Hard",
-  minutes: 0, // derived from sections (see lessonMinutes)
+  minutes: 0, // derived from sections
   objectives: [
-    "Explain what the P, I, and D terms each contribute to a controller's response",
-    "Trace and predict a discrete PID controller's output by hand",
-    "Implement the PD core and a stateful PI controller from scratch",
-    "Diagnose and fix a mis-signed / unstable controller",
-    "Build a shooter velocity controller and add anti-windup to prevent overshoot",
+    "Describe the feedback loop: setpoint, measurement, error, control effort",
+    "Explain P, I, and D as a spring, a damper, and accumulated-error memory",
+    "Read the discrete PID equation and trace a controller's output by hand",
+    "Implement the PD core and a stateful PI velocity controller from scratch",
+    "Diagnose a mis-signed controller and tame integral windup",
   ],
   sections: [
-    // ── LEARN ──────────────────────────────────────────────────────────────
+    // ── CONCEPT 1: the feedback loop ─────────────────────────────────────────
     {
       kind: "learn",
-      minutes: 12,
-      blurb: "What each term does, and the exact math a controller runs every loop.",
+      title: "The Feedback Loop",
+      minutes: 8,
+      blurb: "What a controller actually does, 50 times a second.",
       blocks: [
         {
           type: "text",
-          md: "**PID** is the workhorse of robot control. Given a **setpoint** (where you want to be) and a **measurement** (where you are), a PID controller computes a motor output that shrinks the error to zero. The three terms each answer a different question:\n\n- **P** (proportional) — *how far off am I right now?* Push harder the farther you are.\n- **I** (integral) — *have I been off for a while?* Correct stubborn, lingering error.\n- **D** (derivative) — *how fast am I closing in?* Damp the approach so you don't overshoot.",
+          md: "Almost everything precise a robot does is **closed-loop control**: spin a flywheel to exactly 5000 RPM, hold an arm at 35°, drive forward exactly 2 meters. In each case the code can't just guess an output and hope — it has to *measure* what's actually happening and keep correcting. That continuous measure-compare-correct cycle is **feedback control**, and **PID** is the controller that runs it.",
         },
         {
           type: "text",
-          md: "Calling `controller.calculate()` is convenient, but the math is not magic. Once per loop (every `dt` seconds) a discrete PID controller computes:\n\n`error = setpoint − measurement`\n\n`integral = integral + error · dt`\n\n`derivative = (error − previousError) / dt`\n\n`output = kP·error + kI·integral + kD·derivative`\n\nThe P term scales with *current* error, I with the *accumulated history* of error, and D with the *rate of change* of error — which is why D predicts and damps overshoot.",
-        },
-        {
-          type: "code",
-          lang: "java",
-          caption: "WPILib's PIDController packages that loop for you",
-          code: "PIDController controller = new PIDController(0.1, 0.0, 0.02);\ncontroller.setTolerance(0.02);   // within 2 cm counts as \"there\"\n\n// each loop: measure, compute, apply\ndouble output = controller.calculate(encoder.getDistance(), setpoint);\nmotor.set(output);\n\nif (controller.atSetpoint()) {\n    motor.set(0);\n}",
+          md: "Every loop (in WPILib, about every 20 ms) a PID controller works with three quantities:\n\n- the **setpoint** (also called the *reference*) — where you want to be, e.g. 5000 RPM\n- the **measurement** (the *process variable*) — where you actually are, read from a sensor\n- the **error** — the gap between them: `error = setpoint − measurement`\n\nFrom that error it computes a **control effort** — the number it sends to the motor — chosen to shrink the error toward zero. Get the sign of the error right and a positive error (you're *below* target) produces a positive (forward) push. Flip it and the controller runs *away* from the target, accelerating the error instead of killing it — one of the most common first bugs.",
         },
         {
           type: "callout",
-          tone: "tip",
-          md: "Tune in this order: raise **P** until the mechanism reaches the target but oscillates slightly, add a little **D** to settle it, and reach for **I** last and sparingly — it's the term most likely to cause instability.",
+          tone: "info",
+          md: "PID is **reactive**: it only responds to error that already exists. Later you'll pair it with *feedforward*, which predicts the effort needed in advance — together they're how championship mechanisms move fast and land accurately.",
         },
         {
-          type: "callout",
-          tone: "warn",
-          md: "PID math can return values well outside `[-1, 1]`. Always **clamp the output** to the legal motor range before applying it — feeding raw values to a motor wastes headroom and worsens windup (more on that in Master).",
+          type: "quiz",
+          question: "What is the correct definition of error in a feedback controller?",
+          options: [
+            "error = measurement − setpoint",
+            "error = setpoint − measurement",
+            "error = |setpoint| + |measurement|",
+            "error = setpoint × measurement",
+          ],
+          answerIndex: 1,
+          explanation:
+            "error = setpoint − measurement. With this sign a positive error means you're below the target and the controller pushes forward to close the gap. The opposite sign makes the controller drive away from the setpoint.",
         },
       ],
     },
 
-    // ── PRACTICE ───────────────────────────────────────────────────────────
+    // ── CONCEPT 2: proportional ──────────────────────────────────────────────
     {
-      kind: "practice",
-      minutes: 18,
-      blurb: "Check your understanding, trace code by hand, then write and repair controllers.",
+      kind: "learn",
+      title: "Proportional — the spring",
+      minutes: 11,
+      blurb: "Push in proportion to how far off you are.",
       blocks: [
         {
-          type: "knowledgeCheck",
-          title: "Knowledge check — the three terms",
-          questions: [
-            {
-              question: "Which term is most responsible for reducing overshoot?",
-              options: ["P — proportional", "I — integral", "D — derivative", "Overshoot can't be controlled"],
-              answerIndex: 2,
-              explanation:
-                "D reacts to how fast the error is changing, damping the approach. P alone tends to overshoot, and I can make it worse.",
-            },
-            {
-              question: "Your mechanism stops just short of the target and never quite reaches it. Which term fixes this steady-state error?",
-              options: ["P", "I", "D", "None — it's unavoidable"],
-              answerIndex: 1,
-              explanation:
-                "A small constant error leaves P producing a too-small push. The integral accumulates that lingering error until the output is enough to close the gap.",
-            },
-            {
-              question: "In the discrete loop, what is the derivative term proportional to?",
-              options: [
-                "The current error",
-                "The sum of all past errors",
-                "The change in error since the last loop",
-                "The setpoint",
-              ],
-              answerIndex: 2,
-              explanation:
-                "derivative = (error − previousError) / dt — the rate of change of error. That's why it anticipates and damps fast approaches.",
-            },
-            {
-              question: "What is the correct sign convention for error?",
-              options: [
-                "error = measurement − setpoint",
-                "error = setpoint − measurement",
-                "error = |setpoint − measurement|",
-                "error = setpoint + measurement",
-              ],
-              answerIndex: 1,
-              explanation:
-                "error = setpoint − measurement. With this sign, a positive error means 'below target' and produces a positive (forward) push. Flip it and the controller drives away from the target.",
-            },
-            {
-              question: "You start tuning a brand-new mechanism. Which gain do you bring up first?",
-              options: ["I", "D", "P", "All three at once"],
-              answerIndex: 2,
-              explanation:
-                "Start with P alone to get the basic response, then add D to settle, then I last and sparingly.",
-            },
-          ],
+          type: "text",
+          md: "The **proportional** term is the heart of the controller: it commands an output proportional to the current error.\n\n`output = kP · error`\n\nWPILib describes P as a **software-defined spring**. A stretched spring pulls back harder the farther you stretch it; a P controller pushes harder the farther the mechanism is from its target. `kP` is the spring's stiffness — the volts (or percent output) produced per unit of error. Double the error, double the push.",
+        },
+        {
+          type: "text",
+          md: "Tuning `kP` is a balance. **Too low** and the mechanism is sluggish and never quite arrives — it gives up while there's still a small error left. **Too high** and it slams into the target with so much momentum that it overshoots, then over-corrects back the other way, oscillating around the setpoint. There's also a subtler limit: P alone almost always leaves a small **steady-state error**. As the mechanism nears the target the error shrinks, so `kP · error` shrinks too — until the push is exactly balanced by friction or gravity and the mechanism stalls *just short*. P can't close that last gap on its own; that's the integral term's job.",
+        },
+        {
+          type: "code",
+          lang: "java",
+          caption: "Proportional control, by hand",
+          code: "double error = setpoint - measurement;\ndouble output = kP * error;\nmotor.set(output);",
         },
         {
           type: "predict",
-          prompt: "Trace this single P-controller loop. What does it print?",
+          prompt: "Trace this single proportional loop. What does it print?",
           code: "double kP = 0.5;\ndouble setpoint = 10.0;\ndouble measurement = 7.0;\n\ndouble error = setpoint - measurement;\ndouble output = kP * error;\nSystem.out.println(output);",
           options: ["1.5", "3.0", "8.5", "0.5"],
           answerIndex: 0,
+          explanation: "error = 10 − 7 = 3, output = 0.5 × 3 = 1.5. The farther from target, the larger the push.",
+        },
+        {
+          type: "quiz",
+          question: "A mechanism reaches its target but overshoots and then oscillates back and forth around it before settling. Which single change addresses this most directly?",
+          options: [
+            "Increase kP",
+            "Decrease kP (and/or add some derivative)",
+            "Increase the setpoint",
+            "Reverse the motor",
+          ],
+          answerIndex: 1,
           explanation:
-            "error = 10 − 7 = 3, and output = 0.5 × 3 = 1.5. The farther from target, the larger the push.",
+            "Overshoot-and-oscillate is the classic symptom of too much proportional gain. Lowering kP softens the approach; a derivative term then damps what remains.",
+        },
+        {
+          type: "coding",
+          variant: "debug",
+          title: "Debugging challenge — the runaway controller",
+          prompt:
+            "This P controller drives the mechanism *away* from the target — a robot that accelerates the wrong way. The bug is the classic sign error. Fix `pOutput` so it returns the correct proportional output.",
+          starter:
+            "public double pOutput(double setpoint, double measurement, double kP) {\n    double error = measurement - setpoint;   // bug is on this line\n    return kP * error;\n}",
+          solution:
+            "public double pOutput(double setpoint, double measurement, double kP) {\n    double error = setpoint - measurement;\n    return kP * error;\n}",
+          checks: [
+            { label: "Uses the correct sign: setpoint - measurement", pattern: "error\\s*=\\s*setpoint\\s*-\\s*measurement" },
+            { label: "Returns kP * error", pattern: "return\\s+kP\\s*\\*\\s*error" },
+          ],
+          hint: "Flip the subtraction: `error = setpoint - measurement;`. Below target should give a positive push.",
+          tests: [
+            { method: "pOutput", args: [10.0, 8.0, 0.5], expected: 1.0, tolerance: 1e-9 },
+            { method: "pOutput", args: [0.0, 5.0, 0.2], expected: -1.0, tolerance: 1e-9 },
+            { method: "pOutput", args: [5.0, 5.0, 0.9], expected: 0.0 },
+          ],
+        },
+      ],
+    },
+
+    // ── CONCEPT 3: derivative ────────────────────────────────────────────────
+    {
+      kind: "learn",
+      title: "Derivative — the damper",
+      minutes: 11,
+      blurb: "React to how fast the error is changing.",
+      blocks: [
+        {
+          type: "text",
+          md: "If proportional is a spring, **derivative** is the **shock absorber** bolted next to it. Where P looks at *how far* off you are, D looks at *how fast the error is changing*:\n\n`derivative = (error − previousError) / dt`\n\nWhen the mechanism is racing toward the setpoint, the error is dropping fast, so the derivative is large and negative — and the D term subtracts from the output, easing off the gas *before* you arrive. That's what tames the overshoot a pure-P controller suffers: D anticipates the approach and brakes early. In WPILib's words, it drives the *velocity* error to zero, just as P drives the *position* error to zero.",
+        },
+        {
+          type: "text",
+          md: "Derivative has one important hazard: it amplifies **sensor noise**. Because it differentiates the measurement, a jittery encoder reading turns into a wildly jumpy D term that buzzes the motor. That's why teams keep `kD` modest, filter the measurement, or skip D entirely on noisy mechanisms. Rule of thumb: reach for D only after P is dialed in and you're fighting overshoot.",
+        },
+        {
+          type: "quiz",
+          question: "Which PID term is most responsible for reducing overshoot?",
+          options: ["P — proportional", "I — integral", "D — derivative", "Overshoot can't be controlled"],
+          answerIndex: 2,
+          explanation:
+            "D reacts to the rate of change of error, so it eases off as the mechanism approaches the target — damping the approach. P alone tends to overshoot; I usually makes it worse.",
         },
         {
           type: "coding",
@@ -143,46 +174,79 @@ export const pidLesson: Lesson = {
             { method: "calculate", args: [10.0, 9.0, 2.0, 1.0, 0.5], expected: 0.5, tolerance: 1e-9 },
           ],
         },
+      ],
+    },
+
+    // ── CONCEPT 4: integral ──────────────────────────────────────────────────
+    {
+      kind: "learn",
+      title: "Integral — the memory",
+      minutes: 9,
+      blurb: "Accumulate stubborn error until it's gone — carefully.",
+      blocks: [
         {
-          type: "coding",
-          variant: "debug",
-          title: "Debugging challenge — the runaway controller",
-          prompt:
-            "This P controller drives the mechanism *away* from the target instead of toward it — a robot that accelerates the wrong way. The bug is a classic sign error. Fix `pOutput` so it returns the correct proportional output.",
-          starter:
-            "public double pOutput(double setpoint, double measurement, double kP) {\n    double error = measurement - setpoint;   // bug is on this line\n    return kP * error;\n}",
-          solution:
-            "public double pOutput(double setpoint, double measurement, double kP) {\n    double error = setpoint - measurement;\n    return kP * error;\n}",
-          checks: [
-            { label: "Uses the correct sign: setpoint - measurement", pattern: "error\\s*=\\s*setpoint\\s*-\\s*measurement" },
-            { label: "Returns kP * error", pattern: "return\\s+kP\\s*\\*\\s*error" },
-          ],
-          hint: "Flip the subtraction: `error = setpoint - measurement;`. Below target should give a positive push.",
-          tests: [
-            { method: "pOutput", args: [10.0, 8.0, 0.5], expected: 1.0, tolerance: 1e-9 },
-            { method: "pOutput", args: [0.0, 5.0, 0.2], expected: -1.0, tolerance: 1e-9 },
-            { method: "pOutput", args: [5.0, 5.0, 0.9], expected: 0.0 },
-          ],
+          type: "text",
+          md: "The **integral** term is the only one with *memory*. Each loop it adds the current error to a running accumulator:\n\n`integral = integral + error · dt`, and contributes `kI · integral`.\n\nThat's exactly what defeats the steady-state error P leaves behind. As long as *any* error persists, the integral keeps growing, so its contribution keeps climbing until it finally supplies the extra push that closes the last gap — then it holds that output steady. It drives the *total accumulated error over time* to zero.",
+        },
+        {
+          type: "callout",
+          tone: "warn",
+          md: "That same memory is dangerous, and WPILib explicitly notes **integral gain is generally not recommended for FRC** — most mechanisms are better served by feedforward + P/PD. If error lingers (a stalled mechanism, a saturated output), the accumulator balloons and causes a big overshoot later as it 'unwinds.' This is **integral windup**, and you'll tame it in the Master section.",
+        },
+        {
+          type: "quiz",
+          question: "Your mechanism consistently settles a little short of the target and a pure-P controller never closes that last gap. Which term fixes this steady-state error?",
+          options: ["P", "I", "D", "It's unavoidable"],
+          answerIndex: 1,
+          explanation:
+            "Near the target the error is small, so kP·error is too weak to overcome friction/gravity and the mechanism stalls short. The integral accumulates that lingering error until the output is finally enough.",
         },
       ],
     },
 
-    // ── IMPLEMENT ──────────────────────────────────────────────────────────
+    // ── CONCEPT 5: the discrete loop + tuning ────────────────────────────────
     {
-      kind: "implement",
-      minutes: 16,
-      blurb: "Build a real subsystem controller from scratch, tested across a control loop.",
+      kind: "learn",
+      title: "Putting It Together",
+      minutes: 7,
+      blurb: "The full equation, and the order you tune it.",
       blocks: [
         {
           type: "text",
-          md: "Time to build something a real robot uses. A **shooter** spins a flywheel to a target RPM before firing. Velocity control is a perfect fit for **PI**: P reacts to the current speed error, and I supplies the *steady* output the motor needs to hold RPM against friction once the error reaches zero (a pure-P controller would sag back the instant error vanishes).\n\nYour controller stores `kP`, `kI`, and a running `integral`, and exposes `calculate(targetRpm, measuredRpm)` to be called every loop. Watch what happens at the target: P drops to zero but the integral *holds* the output — that's the whole point.",
+          md: "Stacked together, the three terms form the controller WPILib runs for you each loop:\n\n`output = kP·error + kI·∫error + kD·(d error / dt)`\n\nThe P term scales with *current* error, I with the *accumulated history* of error, and D with the *rate of change* of error. `controller.calculate(measurement, setpoint)` packages all of that; understanding what's inside is what lets you tune it instead of guessing.",
+        },
+        {
+          type: "callout",
+          tone: "tip",
+          md: "Tune in this order: bring **P** up until the mechanism reaches the target but oscillates slightly → add a little **D** to settle it → reach for **I** last and sparingly, only if a steady-state error remains. Always **clamp the output** to the legal motor range before applying it.",
+        },
+        {
+          type: "quiz",
+          question: "You're tuning a brand-new mechanism from scratch. Which gain do you raise first?",
+          options: ["I", "D", "P", "All three together"],
+          answerIndex: 2,
+          explanation: "Start with P alone to get the basic response, then add D to damp overshoot, then I last and sparingly.",
+        },
+      ],
+    },
+
+    // ── IMPLEMENT ────────────────────────────────────────────────────────────
+    {
+      kind: "implement",
+      title: "Implement — Shooter Velocity Controller",
+      minutes: 12,
+      blurb: "Build a real subsystem controller, tested across a control loop.",
+      blocks: [
+        {
+          type: "text",
+          md: "Time to build something a real robot fires with. A **shooter** spins a flywheel up to a target RPM before launching a game piece. Velocity control is a textbook fit for **PI**: P reacts to the current speed error, and I supplies the *steady* output needed to hold RPM against friction once the error reaches zero — a pure-P controller would sag back the instant the error vanished.\n\nYour controller stores `kP`, `kI`, and a running `integral`, and exposes `calculate(targetRpm, measuredRpm)` to be called every loop. Watch the third test: at the target, P drops to zero but the integral *holds* the output. That's the whole reason velocity loops use I.",
         },
         {
           type: "coding",
           variant: "lab",
           title: "Implementation lab — shooter velocity controller",
           prompt:
-            "Implement `ShooterController`. It stores `kP`, `kI`, and a running `integral` (starts at 0). Complete `calculate(double targetRpm, double measuredRpm)`: compute `error = targetRpm - measuredRpm`, add `error` to `integral`, and return `kP*error + kI*integral`. The tests drive one controller across several loops toward 100 RPM and check that the integral holds the output once the flywheel is up to speed.",
+            "Implement `ShooterController`. It stores `kP`, `kI`, and a running `integral` (starts at 0). Complete `calculate(double targetRpm, double measuredRpm)`: compute `error = targetRpm - measuredRpm`, add `error` to `integral`, and return `kP*error + kI*integral`. The tests drive one controller across several loops toward 100 RPM.",
           starter:
             "public class ShooterController {\n    private double kP;\n    private double kI;\n    private double integral = 0;\n\n    public ShooterController(double kP, double kI) {\n        this.kP = kP;\n        this.kI = kI;\n    }\n\n    public double calculate(double targetRpm, double measuredRpm) {\n        // error, accumulate into integral, then return kP*error + kI*integral\n    }\n}",
           solution:
@@ -209,15 +273,16 @@ export const pidLesson: Lesson = {
       ],
     },
 
-    // ── MASTER ─────────────────────────────────────────────────────────────
+    // ── MASTER ───────────────────────────────────────────────────────────────
     {
       kind: "master",
-      minutes: 14,
-      blurb: "Defeat integral windup, then prove you can reason about a full controller.",
+      title: "Master — Tame Integral Windup",
+      minutes: 12,
+      blurb: "Defeat windup, then prove you can reason about a full controller.",
       blocks: [
         {
           type: "text",
-          md: "Your shooter controller has a hidden flaw. **Integral windup**: while the flywheel is still spinning up (or if it stalls), error persists and the integral keeps *accumulating*. By the time the motor catches up, that ballooned integral drives a big overshoot as it 'unwinds.' The simplest robust fix is to **clamp the integrator** to a maximum magnitude, so its stored energy can never run away.\n\nBuild a controller that caps its own integral in `[-maxIntegral, maxIntegral]` every loop. The tests push a large, persistent error and confirm the integral saturates instead of exploding.",
+          md: "Your shooter controller has a hidden flaw — the windup warned about earlier. While the flywheel is still spinning up (or if it jams), error persists and the integral keeps *accumulating*. By the time the motor catches up, that ballooned integral drives a big overshoot as it 'unwinds.' The simplest robust fix is to **clamp the integrator** to a maximum magnitude, so its stored energy can never run away.\n\nBuild a controller that caps its own integral within `[-maxIntegral, maxIntegral]` every loop. The tests push a large, persistent error and confirm the integral saturates instead of exploding.",
         },
         {
           type: "coding",
@@ -270,7 +335,7 @@ export const pidLesson: Lesson = {
             },
             {
               question:
-                "A velocity controller holds the target perfectly but takes too long to get there, lagging well behind commanded speed. What's the most direct fix?",
+                "A velocity controller holds the target perfectly but takes too long to get there, lagging well behind commanded speed. Most direct fix?",
               options: [
                 "Lower kI",
                 "Raise kP so it pushes harder while error is large",
