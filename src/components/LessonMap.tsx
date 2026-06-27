@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Track, Lesson } from "@/lib/types";
-import { trackLessons, activityCount } from "@/lib/curriculum";
+import { trackLessons, activityCount, lessonMinutes } from "@/lib/curriculum";
+import type { LessonDifficulty } from "@/lib/types";
 import { useProgress } from "./ProgressProvider";
 import { SegmentRing } from "./SegmentRing";
 import { Decoration, type DecorKind } from "./MapDecor";
@@ -11,8 +12,10 @@ import { Decoration, type DecorKind } from "./MapDecor";
 // --- Layout constants -----------------------------------------------------
 const MAP_W = 340; // logical map width; centered via mx-auto
 const CENTER = MAP_W / 2;
-const ROW_H = 132; // vertical distance between consecutive nodes
-const MODULE_GAP = 74; // extra space before a new module, so its banner has room
+const ROW_H = 170; // vertical distance between consecutive nodes (sized so a
+                   // node's ~62px info card clears the next node's icon)
+const MODULE_GAP = 96; // extra space before a new module, so its banner clears
+                       // the previous node's info card
 const START_Y = 150; // top padding so the first banner + START bubble fit
 const BANNER_GAP = 130; // banner sits above a node — high enough to clear the
                         // floating "Start" bubble that hangs over the current node
@@ -235,12 +238,23 @@ export function LessonMap({ track }: { track: Track }) {
                 {done ? "★" : unlocked ? "▶" : "🔒"}
               </div>
             </div>
-            <div
-              className={`pointer-events-none mt-2 max-w-[7.5rem] rounded-md bg-ink/75 px-2 py-0.5 text-center text-xs font-medium leading-snug backdrop-blur-sm ${
-                unlocked ? "text-white" : "text-muted"
-              }`}
-            >
-              {it.lesson.title}
+            {/* Navigation card: topic + estimated time + difficulty. Status is
+                carried by the node icon/ring, so the card stays uncluttered.
+                Absolutely positioned below the circle so its height never shifts
+                the circle or the Start bubble (the column is centered on y). */}
+            <div className="pointer-events-none absolute left-1/2 top-full mt-2 w-[7.5rem] -translate-x-1/2 rounded-lg border border-edge bg-ink/85 px-2 py-1 text-center backdrop-blur-sm">
+              <div className={`text-xs font-semibold leading-snug ${unlocked ? "text-white" : "text-muted"}`}>
+                {it.lesson.title}
+              </div>
+              <div className="mt-1 flex items-center justify-center gap-1.5 text-[10px] text-muted">
+                <span>{lessonMinutes(it.lesson)}m</span>
+                {it.lesson.difficulty && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <DifficultyDots difficulty={it.lesson.difficulty} />
+                  </>
+                )}
+              </div>
             </div>
           </div>
         );
@@ -280,6 +294,30 @@ export function LessonMap({ track }: { track: Track }) {
         <div className="mt-2 text-center text-xs text-muted">Track complete</div>
       </div>
     </div>
+  );
+}
+
+// Difficulty as four bars filled to the lesson's rank, color-coded — a quick
+// at-a-glance signal on the roadmap node.
+const DIFFICULTY: Record<LessonDifficulty, { rank: number; color: string }> = {
+  Easy: { rank: 1, color: "#22c55e" },
+  Medium: { rank: 2, color: "#60a5fa" },
+  Hard: { rank: 3, color: "#f59e0b" },
+  Expert: { rank: 4, color: "#ef4444" },
+};
+
+function DifficultyDots({ difficulty }: { difficulty: LessonDifficulty }) {
+  const { rank, color } = DIFFICULTY[difficulty];
+  return (
+    <span className="flex items-center gap-0.5" title={difficulty} aria-label={`Difficulty: ${difficulty}`}>
+      {[0, 1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className="h-1 w-1.5 rounded-[1px]"
+          style={{ background: i < rank ? color : "#34406099" }}
+        />
+      ))}
+    </span>
   );
 }
 

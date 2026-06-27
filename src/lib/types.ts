@@ -24,8 +24,38 @@ export type Block =
       explanation: string;
     }
   | {
+      /** A grouped set of MCQs (the "Knowledge Check" assessment tier). Passes
+       *  only when every question is answered correctly. Use this instead of
+       *  scattering single `quiz` blocks when verifying conceptual mastery. */
+      type: "knowledgeCheck";
+      title?: string;
+      questions: {
+        question: string;
+        options: string[];
+        answerIndex: number;
+        explanation: string;
+      }[];
+    }
+  | {
+      /** "Predict the output": learner reads code and picks what it prints /
+       *  returns. Trains code tracing without writing any. */
+      type: "predict";
+      prompt: string;
+      code: string;
+      options: string[];
+      answerIndex: number;
+      explanation: string;
+    }
+  | {
       type: "coding";
       prompt: string;
+      /** Which assessment tier this exercise serves, for labelling/structure:
+       *  - "exercise" (default): fill-in / write-from-prompt practice
+       *  - "debug": starter is intentionally broken; learner repairs it
+       *  - "lab": a substantial Implement-section build-from-scratch task */
+      variant?: "exercise" | "debug" | "lab";
+      /** Optional heading shown above the exercise (e.g. lab name). */
+      title?: string;
       /** Pre-filled editor contents. */
       starter: string;
       /** A reference solution revealed after success or via "Show solution". */
@@ -78,14 +108,42 @@ export interface RuntimeStateTest {
   label?: string;
 }
 
+/** Per-lesson difficulty, surfaced on the roadmap node as a quick signal.
+ *  Distinct from a Track's `level` (which tiers the whole curriculum). */
+export type LessonDifficulty = "Easy" | "Medium" | "Hard" | "Expert";
+
+/** The four-part pedagogy every redesigned lesson follows. */
+export type SectionKind = "learn" | "practice" | "implement" | "master";
+
+/** A phase of a lesson. Blocks reuse the existing/assessment block types, so a
+ *  section is just a titled, time-estimated bundle of them. */
+export interface LessonSection {
+  kind: SectionKind;
+  /** Optional title override; a sensible default is derived from `kind`. */
+  title?: string;
+  blurb?: string;
+  /** Estimated minutes for this section (sums to the lesson estimate). */
+  minutes: number;
+  blocks: Block[];
+}
+
 export interface Lesson {
   id: string;
   title: string;
   /** One-line summary shown in lists. */
   blurb: string;
-  /** Estimated minutes to complete. */
+  /** Estimated minutes to complete. Legacy lessons set this directly; for
+   *  sectioned lessons it's the sum of section minutes (see lessonMinutes). */
   minutes: number;
-  blocks: Block[];
+  /** Roadmap difficulty signal. Optional for legacy lessons. */
+  difficulty?: LessonDifficulty;
+  /** "By the end you can…" goals shown atop the detail page. */
+  objectives?: string[];
+  /** New structured model: Learn → Practice → Implement → Master. */
+  sections?: LessonSection[];
+  /** Legacy flat model. Present on un-migrated lessons; mutually exclusive
+   *  with `sections` in practice. Read both via lessonBlocks(). */
+  blocks?: Block[];
 }
 
 export interface Module {

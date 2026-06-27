@@ -1,4 +1,5 @@
 import type { Track, Lesson } from "./types";
+import { pidLesson } from "./lessons/pid";
 
 // ---------------------------------------------------------------------------
 // Intermediate Track: sensors, closed-loop control, and autonomous.
@@ -243,161 +244,6 @@ const gyro: Lesson = {
         { method: "shortestTurn", args: [90.0, 0.0], expected: 90.0, tolerance: 1e-9 },
         { method: "shortestTurn", args: [10.0, 350.0], expected: 20.0, tolerance: 1e-9 },
         { method: "shortestTurn", args: [0.0, 0.0], expected: 0.0 },
-      ],
-    },
-  ],
-};
-
-const pidControl: Lesson = {
-  id: "pid-control",
-  title: "PID Control",
-  blurb: "Drive a measured value to a target — and implement the controller math yourself.",
-  minutes: 18,
-  blocks: [
-    {
-      type: "text",
-      md: "**PID** is the workhorse of robot control. Given a **setpoint** (where you want to be) and a **measurement** (where you are), a PID controller computes a motor output that shrinks the error to zero. The three terms:\n\n- **P** (proportional) — push harder the farther you are from the target\n- **I** (integral) — correct stubborn, lingering error over time\n- **D** (derivative) — damp the approach so you don't overshoot",
-    },
-    {
-      type: "code",
-      lang: "java",
-      caption: "WPILib's PIDController does the math for you",
-      code: "PIDController controller = new PIDController(0.1, 0.0, 0.02);\n\n// each loop: measure, compute, apply\ndouble output = controller.calculate(encoder.getDistance(), setpoint);\nmotor.set(output);",
-    },
-    {
-      type: "callout",
-      tone: "tip",
-      md: "Start tuning with only **P**. Raise it until the mechanism reaches the target but oscillates slightly, then add a little **D** to settle it. Reach for **I** last, and sparingly — it's the most likely term to cause instability.",
-    },
-    {
-      type: "text",
-      md: "A controller knows it's done when the error is small enough. `atSetpoint()` reports that, using a tolerance you set:",
-    },
-    {
-      type: "code",
-      lang: "java",
-      code: "controller.setTolerance(0.02);   // within 2 cm counts as \"there\"\nif (controller.atSetpoint()) {\n    motor.set(0);\n}",
-    },
-    {
-      type: "quiz",
-      question: "Which PID term is most responsible for reducing overshoot?",
-      options: [
-        "P — proportional",
-        "I — integral",
-        "D — derivative",
-        "None; overshoot can't be controlled",
-      ],
-      answerIndex: 2,
-      explanation:
-        "The derivative term reacts to how fast the error is changing, damping the approach and reducing overshoot. P alone tends to overshoot; I can make it worse.",
-    },
-    {
-      type: "coding",
-      prompt:
-        "Using the existing `controller`, compute the PID output toward `setpoint` from `encoder.getDistance()` and apply it to `motor`.",
-      starter: "public void execute() {\n    // compute the PID output and apply it to the motor\n}",
-      solution:
-        "public void execute() {\n    double out = controller.calculate(encoder.getDistance(), setpoint);\n    motor.set(out);\n}",
-      checks: [
-        { label: "Calls controller.calculate(...)", pattern: "controller\\.calculate\\(" },
-        { label: "Uses the encoder measurement", pattern: "encoder\\.getDistance\\(\\s*\\)" },
-        { label: "Applies the output to the motor", pattern: "motor\\.set\\(" },
-      ],
-      hint: "Get `controller.calculate(measurement, setpoint)`, store it, then `motor.set(...)` it.",
-    },
-    {
-      type: "text",
-      md: "**The integral term is powerful and dangerous.** When error persists — say the mechanism is stalled or the output is already maxed out — the I term keeps *accumulating*. This is **integral windup**: the integrator builds a huge value, and once the robot finally catches up it dramatically overshoots while that accumulation 'unwinds.' Symptoms: big overshoot after a disturbance and a sluggish, sticky recovery. Mitigate it by clamping the output, limiting the integrator (an *integral zone* that only integrates near the setpoint), or just using less I.",
-    },
-    {
-      type: "callout",
-      tone: "tip",
-      md: "Always **clamp the controller's output** to the legal motor range before applying it. PID math can return values well outside [-1, 1], and feeding those straight to a motor wastes the headroom feedforward needs and worsens windup.",
-    },
-    {
-      type: "quiz",
-      question:
-        "After a large disturbance your mechanism overshoots badly and recovers slowly, and the integral term seems 'stuck' high. What's the most likely cause?",
-      options: [
-        "The proportional gain is too low",
-        "Integral windup — the integrator accumulated a large value while error persisted; clamp the output or limit the integrator",
-        "The derivative gain is negative",
-        "The setpoint is too close to zero",
-      ],
-      answerIndex: 1,
-      explanation:
-        "While error persists (e.g., output saturated), the integral keeps growing. When the system finally responds, that stored-up integral causes overshoot as it unwinds. Output clamping, an integral zone, or a max-integrator limit prevent it.",
-    },
-    {
-      type: "coding",
-      prompt:
-        "Compute the PID output and clamp it to [-1, 1] before applying. Use `controller.calculate(measurement, setpoint)`, then `Math.max(-1, Math.min(1, out))`, then `motor.set(out)`.",
-      starter:
-        "public void execute() {\n    double out = controller.calculate(measurement, setpoint);\n    // clamp out to [-1, 1], then apply it\n}",
-      solution:
-        "public void execute() {\n    double out = controller.calculate(measurement, setpoint);\n    out = Math.max(-1, Math.min(1, out));\n    motor.set(out);\n}",
-      checks: [
-        { label: "Clamps the upper bound with Math.min(1, ...)", pattern: "Math\\.min\\(\\s*1" },
-        { label: "Clamps the lower bound with Math.max(-1, ...)", pattern: "Math\\.max\\(\\s*-\\s*1" },
-        { label: "Applies the clamped output to the motor", pattern: "motor\\.set\\(" },
-      ],
-      hint: "`out = Math.max(-1, Math.min(1, out));` then `motor.set(out);`",
-    },
-    {
-      type: "text",
-      md: "Calling `controller.calculate()` is convenient, but you should understand what it computes — it's not magic. A discrete PID controller, once per loop, does exactly this:\n\n`error = setpoint − measurement`\n\n`derivative = (error − previousError) / dt`\n\n`output = kP·error + kI·(accumulated error) + kD·derivative`\n\nThe P term is proportional to *current* error, D to the *rate of change* of error (which is why it predicts and damps overshoot), and I to the *history* of error. Implementing even the PD core makes the tuning intuition concrete: P provides the restoring push, D fights the velocity that causes overshoot.",
-    },
-    {
-      type: "coding",
-      prompt:
-        "Implement a PD controller's per-loop output. Write `double calculate(double setpoint, double measurement, double prevError, double kP, double kD)`: compute `error = setpoint - measurement`, `derivative = error - prevError`, and return `kP*error + kD*derivative`.",
-      starter:
-        "public double calculate(double setpoint, double measurement, double prevError, double kP, double kD) {\n    double error = setpoint - measurement;\n    // derivative is the change in error since last loop\n    // return the weighted sum of the P and D terms\n}",
-      solution:
-        "public double calculate(double setpoint, double measurement, double prevError, double kP, double kD) {\n    double error = setpoint - measurement;\n    double derivative = error - prevError;\n    return kP * error + kD * derivative;\n}",
-      checks: [
-        { label: "Computes error = setpoint - measurement", pattern: "error\\s*=\\s*setpoint\\s*-\\s*measurement" },
-        { label: "Computes derivative from the change in error", pattern: "derivative\\s*=\\s*error\\s*-\\s*prevError" },
-        { label: "Returns kP*error + kD*derivative", pattern: "kP\\s*\\*\\s*error\\s*\\+\\s*kD\\s*\\*\\s*derivative" },
-      ],
-      hint: "`double derivative = error - prevError;` then `return kP * error + kD * derivative;`.",
-      tests: [
-        { method: "calculate", args: [10.0, 8.0, 3.0, 0.5, 0.1], expected: 0.9, tolerance: 1e-9 },
-        { method: "calculate", args: [10.0, 10.0, 0.0, 0.5, 0.1], expected: 0.0 },
-        { method: "calculate", args: [5.0, 0.0, 0.0, 0.2, 0.0], expected: 1.0, tolerance: 1e-9 },
-        { method: "calculate", args: [0.0, 5.0, 0.0, 0.5, 0.0], expected: -2.5, tolerance: 1e-9 },
-        { method: "calculate", args: [10.0, 9.0, 2.0, 1.0, 0.5], expected: 0.5, tolerance: 1e-9 },
-      ],
-    },
-    {
-      type: "text",
-      md: "The **integral** term is fundamentally different from P and D: it has *memory*. Each loop it adds the current error to a running `integral` accumulator, so it grows as long as error persists — that's how it defeats steady-state error a pure-P controller can't. But that same memory is the source of **windup**: if error lingers (a stalled mechanism, a saturated output), the accumulator balloons and causes a big overshoot later when it 'unwinds'. You can only feel this by running the controller across *multiple* loops and watching the output keep climbing even when error is constant.",
-    },
-    {
-      type: "coding",
-      prompt:
-        "Implement a PI controller that accumulates state across calls. The `Controller` class stores `kP`, `kI`, and a running `integral` (starts at 0). Complete `calculate(double error)` so it adds `error` to `integral`, then returns `kP*error + kI*integral`. The tests call it repeatedly on one instance — watch the integral build up.",
-      starter:
-        "public class Controller {\n    private double kP;\n    private double kI;\n    private double integral = 0;\n\n    public Controller(double kP, double kI) {\n        this.kP = kP;\n        this.kI = kI;\n    }\n\n    public double calculate(double error) {\n        // accumulate error into integral, then return kP*error + kI*integral\n    }\n}",
-      solution:
-        "public class Controller {\n    private double kP;\n    private double kI;\n    private double integral = 0;\n\n    public Controller(double kP, double kI) {\n        this.kP = kP;\n        this.kI = kI;\n    }\n\n    public double calculate(double error) {\n        integral += error;\n        return kP * error + kI * integral;\n    }\n}",
-      checks: [
-        { label: "Accumulates error into the integral", pattern: "integral\\s*\\+=\\s*error|integral\\s*=\\s*integral\\s*\\+\\s*error" },
-        { label: "Returns kP*error + kI*integral", pattern: "kP\\s*\\*\\s*error\\s*\\+\\s*kI\\s*\\*\\s*integral" },
-      ],
-      hint: "Two lines: `integral += error;` then `return kP * error + kI * integral;`. Because `integral` is a field, it survives between calls — that's what makes the I term accumulate.",
-      stateTests: [
-        {
-          className: "Controller",
-          ctorArgs: [0.5, 0.1],
-          label: "constant error 2.0",
-          steps: [
-            { method: "calculate", args: [2.0], expected: 1.2, tolerance: 1e-9 },
-            { method: "calculate", args: [2.0], expected: 1.4, tolerance: 1e-9 },
-            { method: "calculate", args: [2.0], expected: 1.6, tolerance: 1e-9 },
-            { method: "calculate", args: [0.0], expected: 0.6, tolerance: 1e-9, label: "error gone, but integral persists (windup) → 0.6" },
-          ],
-        },
       ],
     },
   ],
@@ -790,7 +636,7 @@ export const intermediateTrack: Track = {
       id: "closed-loop",
       title: "Closed-Loop Control",
       blurb: "Drive measured values to targets with PID and feedforward.",
-      lessons: [pidControl, feedforward],
+      lessons: [pidLesson, feedforward],
     },
     {
       id: "autonomous",

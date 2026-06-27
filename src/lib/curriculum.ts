@@ -1,4 +1,4 @@
-import type { Track, Lesson } from "./types";
+import type { Track, Lesson, Block } from "./types";
 import { intermediateTrack } from "./track-intermediate";
 import { advancedTrack } from "./track-advanced";
 import { swerveTrack } from "./track-swerve";
@@ -1531,9 +1531,34 @@ export function trackLessons(track: Track): Lesson[] {
   return track.modules.flatMap((m) => m.lessons);
 }
 
-/** Number of gradable activities (quizzes + coding) in a lesson. */
+/** All blocks of a lesson in order, transparently across the new sectioned
+ *  model and the legacy flat model. Everything else should read blocks via
+ *  this rather than touching `lesson.blocks` / `lesson.sections` directly. */
+export function lessonBlocks(lesson: Lesson): Block[] {
+  if (lesson.sections?.length) return lesson.sections.flatMap((s) => s.blocks);
+  return lesson.blocks ?? [];
+}
+
+/** Estimated minutes: sum of section estimates for sectioned lessons, else the
+ *  lesson's own `minutes`. */
+export function lessonMinutes(lesson: Lesson): number {
+  if (lesson.sections?.length) return lesson.sections.reduce((n, s) => n + s.minutes, 0);
+  return lesson.minutes;
+}
+
+/** True if a block is a gradable activity (counts toward lesson completion). */
+function isGradable(b: Block): boolean {
+  return (
+    b.type === "quiz" ||
+    b.type === "coding" ||
+    b.type === "knowledgeCheck" ||
+    b.type === "predict"
+  );
+}
+
+/** Number of gradable activities in a lesson (across both content models). */
 export function activityCount(lesson: Lesson): number {
-  return lesson.blocks.filter((b) => b.type === "quiz" || b.type === "coding").length;
+  return lessonBlocks(lesson).filter(isGradable).length;
 }
 
 export function nextLesson(lessonId: string): Lesson | undefined {

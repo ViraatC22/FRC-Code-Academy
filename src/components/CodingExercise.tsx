@@ -12,6 +12,10 @@ interface CodingExerciseProps {
   /** Identifies which exercise this attempt belongs to, for persisted submissions. */
   lessonId: string;
   blockIndex: number;
+  /** Assessment tier, drives the header label. Defaults to a plain exercise. */
+  variant?: "exercise" | "debug" | "lab";
+  /** Optional heading shown above the exercise (e.g. a lab name). */
+  title?: string;
   prompt: string;
   starter: string;
   solution: string;
@@ -28,9 +32,17 @@ function meaningful(code: string): string {
   return normalize(code.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, ""));
 }
 
+const variantLabel: Record<NonNullable<CodingExerciseProps["variant"]>, string> = {
+  exercise: "Coding exercise",
+  debug: "Debugging challenge",
+  lab: "Implementation lab",
+};
+
 export function CodingExercise({
   lessonId,
   blockIndex,
+  variant = "exercise",
+  title,
   prompt,
   starter,
   solution,
@@ -130,8 +142,9 @@ export function CodingExercise({
   return (
     <div className="my-6 rounded-xl border border-edge bg-panel p-5">
       <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-brand2">
-        Coding exercise
+        {variantLabel[variant]}
       </div>
+      {title && <div className="mb-1 text-base font-semibold text-white">{title}</div>}
       <div className="mb-3">
         <InlineMd md={prompt} />
       </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
-import { getTrack, trackLessons } from "@/lib/curriculum";
+import { getTrack, trackLessons, lessonMinutes } from "@/lib/curriculum";
 import { useProgress } from "@/components/ProgressProvider";
 
 export default function TrackPage() {
@@ -94,7 +94,10 @@ export default function TrackPage() {
                         <div className="text-sm text-muted">{lesson.blurb}</div>
                       </div>
                     </div>
-                    <span className="shrink-0 text-xs text-muted">{lesson.minutes} min</span>
+                    <span className="shrink-0 text-xs text-muted">
+                      {lessonMinutes(lesson)} min
+                      {lesson.difficulty && ` · ${lesson.difficulty}`}
+                    </span>
                   </>
                 );
 

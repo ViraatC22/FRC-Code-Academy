@@ -15,6 +15,7 @@ export default {
         accent: "#f59e0b",
         good: "#22c55e",
         bad: "#ef4444",
+        purple: "#a855f7",
         muted: "#8b96ad",
       },
       fontFamily: {
